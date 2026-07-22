@@ -52,10 +52,20 @@ function getCookie(request: VercelRequest, name: string) {
 }
 
 function getRouteSegments(request: VercelRequest) {
+  const routeParam = request.query.route;
+  if (Array.isArray(routeParam)) {
+    return routeParam.flatMap((segment) => segment.split('/')).filter(Boolean);
+  }
+
+  if (typeof routeParam === 'string' && routeParam) {
+    return routeParam.split('/').filter(Boolean);
+  }
+
   const host = request.headers.host ?? 'localhost';
   const url = new URL(request.url ?? '/', `http://${host}`);
   return url.pathname
     .replace(/^\/api\/?/, '')
+    .replace(/^\[\.\.\.route\]\/?/, '')
     .split('/')
     .filter(Boolean);
 }
