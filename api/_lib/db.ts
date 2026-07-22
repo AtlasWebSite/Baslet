@@ -1,5 +1,5 @@
 import { sql } from '@vercel/postgres';
-import type { SessionUser } from './session';
+import type { SessionUser } from './session.js';
 
 let schemaPromise: Promise<void> | undefined;
 

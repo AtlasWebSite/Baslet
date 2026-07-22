@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { deleteMentalMapForUser, getMentalMap, updateMentalMapForUser } from '../_lib/data';
-import { json, methodNotAllowed, readJsonBody } from '../_lib/http';
-import { requireSessionUser } from '../_lib/session';
+import { deleteMentalMapForUser, getMentalMap, updateMentalMapForUser } from '../_lib/data.js';
+import { json, methodNotAllowed, readJsonBody } from '../_lib/http.js';
+import { requireSessionUser } from '../_lib/session.js';
 
 function getId(request: VercelRequest) {
   return typeof request.query.id === 'string' ? request.query.id : '';

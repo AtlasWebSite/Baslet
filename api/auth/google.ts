@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getAppUrl, json, methodNotAllowed, requireEnvironment } from '../_lib/http';
+import { getAppUrl, json, methodNotAllowed, requireEnvironment } from '../_lib/http.js';
 
 export default function handler(request: VercelRequest, response: VercelResponse) {
   if (request.method !== 'GET') {

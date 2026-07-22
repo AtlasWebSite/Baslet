@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getAppUrl, requireEnvironment } from '../_lib/http';
-import { upsertProfileFromSession } from '../_lib/db';
-import { setSessionCookie, type SessionUser } from '../_lib/session';
+import { getAppUrl, requireEnvironment } from '../_lib/http.js';
+import { upsertProfileFromSession } from '../_lib/db.js';
+import { setSessionCookie, type SessionUser } from '../_lib/session.js';
 
 interface GoogleTokenResponse {
   access_token?: string;

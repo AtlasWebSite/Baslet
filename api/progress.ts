@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { saveProgress } from './_lib/data';
-import { json, methodNotAllowed, readJsonBody } from './_lib/http';
-import { requireSessionUser } from './_lib/session';
+import { saveProgress } from './_lib/data.js';
+import { json, methodNotAllowed, readJsonBody } from './_lib/http.js';
+import { requireSessionUser } from './_lib/session.js';
 
 export default async function handler(request: VercelRequest, response: VercelResponse) {
   if (request.method !== 'POST') {

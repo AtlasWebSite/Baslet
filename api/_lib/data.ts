@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { sql } from '@vercel/postgres';
-import { ensureSchema } from './db';
-import type { SessionUser } from './session';
+import { ensureSchema } from './db.js';
+import type { SessionUser } from './session.js';
 
 type StudySetIcon = 'language' | 'biology' | 'history' | 'math' | 'general';
 type Mastery = 0 | 1 | 2 | 3;

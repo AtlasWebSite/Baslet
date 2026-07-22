@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { jwtVerify, SignJWT } from 'jose';
-import { requireEnvironment } from './http';
+import { requireEnvironment } from './http.js';
 
 const COOKIE_NAME = 'studyflow_session';
 const MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
