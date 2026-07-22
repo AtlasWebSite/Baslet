@@ -1,0 +1,35 @@
+{
+  "name": "studyflow",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vercel dev",
+    "dev:vite": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@vercel/postgres": "^0.10.0",
+    "@vitejs/plugin-react": "latest",
+    "jose": "^6.2.4",
+    "lucide-react": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "typescript": "latest",
+    "vite": "latest"
+  },
+  "devDependencies": {
+    "@eslint/js": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "@vercel/node": "^5.8.26",
+    "eslint": "latest",
+    "eslint-plugin-react-hooks": "latest",
+    "eslint-plugin-react-refresh": "latest",
+    "globals": "latest",
+    "typescript-eslint": "latest",
+    "vercel": "^56.4.1"
+  }
+}
