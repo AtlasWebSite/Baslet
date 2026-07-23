@@ -18,14 +18,16 @@ Copie `.env.example` para `.env.local` no desenvolvimento e configure também es
 GOOGLE_CLIENT_ID=seu-client-id-google
 GOOGLE_CLIENT_SECRET=seu-client-secret-google
 AUTH_SECRET=uma-string-grande-aleatoria
-APP_URL=http://localhost:5173
+APP_URL=http://localhost:3000
 POSTGRES_URL=postgres://usuario:senha@host/database
+MERCADO_PAGO_ACCESS_TOKEN=TEST-ou-APP_USR-token-de-teste
+MERCADO_PAGO_WEBHOOK_SECRET=segredo-do-webhook
 ```
 
 Na produção, `APP_URL` deve ser o domínio final:
 
 ```env
-APP_URL=https://seu-app.vercel.app
+APP_URL=https://app-usestudyflow.vercel.app
 ```
 
 ## Google Cloud
@@ -33,8 +35,8 @@ APP_URL=https://seu-app.vercel.app
 No cliente OAuth Web do Google Cloud, cadastre:
 
 ```text
-http://localhost:5173/api/auth/callback
-https://seu-app.vercel.app/api/auth/callback
+http://localhost:3000/api/auth/callback
+https://app-usestudyflow.vercel.app/api/auth/callback
 ```
 
 Use o mesmo `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET` nas variáveis da Vercel.
@@ -64,9 +66,19 @@ npm run build
 
 ## Assinatura
 
-O pagamento Mercado Pago foi deixado temporariamente em bypass local, conforme solicitado. Ao clicar em “Assinar agora”, o app libera Premium no navegador para continuar os testes.
+O pagamento usa Mercado Pago pelo backend da Vercel. O frontend nunca recebe o Access Token.
 
-Antes de produção, reative uma integração real de pagamento via rota serverless e webhook.
+Configure o webhook no Mercado Pago:
+
+```text
+https://app-usestudyflow.vercel.app/api/mercado-pago/webhook
+```
+
+A tela pública de pagamento fica em:
+
+```text
+https://app-usestudyflow.vercel.app/pagamento
+```
 
 ## Segurança
 
