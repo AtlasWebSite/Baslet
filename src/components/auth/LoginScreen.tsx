@@ -48,13 +48,13 @@ export function LoginScreen() {
 
   return (
     <main className="login-screen">
-      <section className="login-showcase" aria-labelledby="login-showcase-title">
+      <section className="login-showcase hero-content" aria-labelledby="login-showcase-title">
         <div className="login-showcase__orb login-showcase__orb--one" />
         <div className="login-showcase__orb login-showcase__orb--two" />
 
         <div className="login-showcase__copy">
           <span className="eyebrow"><Sparkles size={14} /> StudyFlow</span>
-          <h1 id="login-showcase-title">Estude melhor.<br />Organize seu progresso.</h1>
+          <h1 id="login-showcase-title" className="hero-title">Estude melhor.<br />Organize seu progresso.</h1>
           <p>Crie flashcards, pratique com testes e acompanhe sua evolução em um só lugar.</p>
 
           <div className="login-feature-row" aria-label="Recursos do StudyFlow">
@@ -64,7 +64,7 @@ export function LoginScreen() {
           </div>
         </div>
 
-        <div className="study-illustration" aria-hidden="true">
+        <div className="study-illustration study-visual" aria-hidden="true">
           <div className="study-illustration__line study-illustration__line--one" />
           <div className="study-illustration__line study-illustration__line--two" />
           <div className="study-book-stack"><i /><i /><i /></div>
@@ -96,7 +96,7 @@ export function LoginScreen() {
       </section>
 
       <aside className="login-panel">
-        <section className="login-card" aria-labelledby="login-title">
+        <section className="login-card login-panel-content" aria-labelledby="login-title">
           <Logo />
           <span className="eyebrow">SEU ESPAÇO DE APRENDIZADO</span>
           <h1 id="login-title">Bem-vindo ao StudyFlow</h1>
