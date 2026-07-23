@@ -3,7 +3,7 @@ import { getContentPrompt, getSystemPrompt } from './aiPrompts.js';
 import { AiValidationError, parseAiJson, validateAiContent, type AiContentType } from './aiSchemas.js';
 import { requireEnvironment } from './http.js';
 
-const DEFAULT_MODEL = 'kimi-k3';
+const DEFAULT_MODEL = 'kimi-k2.5';
 const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
 
 interface KimiUsage {
@@ -110,4 +110,3 @@ export async function generateContentWithKimi(type: AiContentType, topic: string
 
   throw lastError;
 }
-

@@ -644,7 +644,7 @@ async function handleAiGenerateStudyContent(request: VercelRequest, response: Ve
         user,
         contentType,
         topic,
-        model: process.env.KIMI_MODEL ?? 'kimi-k3',
+        model: process.env.KIMI_MODEL ?? 'kimi-k2.5',
         status: 'failed',
       }).catch(() => undefined);
     }
