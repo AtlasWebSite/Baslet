@@ -16,10 +16,20 @@ import {
   markStarterContentCreated,
   saveProgress,
   saveQuiz,
+  saveMercadoPagoSubscriptionForUser,
+  updateSubscriptionFromMercadoPago,
   updateMentalMapForUser,
 } from './_lib/data.js';
 import { upsertProfileFromSession } from './_lib/db.js';
 import { getAppUrl, json, methodNotAllowed, readJsonBody, requireEnvironment } from './_lib/http.js';
+import {
+  cancelMercadoPagoSubscription,
+  createMercadoPagoSubscription,
+  extractMercadoPagoWebhookResourceId,
+  getMercadoPagoCheckoutUrl,
+  getMercadoPagoSubscription,
+  isMercadoPagoWebhookSignatureValid,
+} from './_lib/mercadoPago.js';
 import {
   clearSessionCookie,
   getSessionUser,
@@ -99,6 +109,18 @@ function unauthorized(response: VercelResponse, message = 'Entre novamente para 
 
 function routeNotFound(response: VercelResponse) {
   json(response, 404, { error: 'Rota não encontrada.' });
+}
+
+async function syncSubscriptionWithMercadoPago(preapprovalId?: string | null) {
+  if (!preapprovalId || !process.env.MERCADO_PAGO_ACCESS_TOKEN) return null;
+
+  try {
+    const preapproval = await getMercadoPagoSubscription(preapprovalId);
+    return updateSubscriptionFromMercadoPago(preapproval);
+  } catch (error) {
+    console.error('Erro ao sincronizar assinatura Mercado Pago:', error);
+    return null;
+  }
 }
 
 async function handleGoogleLogin(request: VercelRequest, response: VercelResponse) {
@@ -371,7 +393,9 @@ async function handleSubscription(request: VercelRequest, response: VercelRespon
 
   try {
     const user = await requireSessionUser(request);
-    const subscription = await getSubscription(user);
+    const existingSubscription = await getSubscription(user);
+    const syncedSubscription = await syncSubscriptionWithMercadoPago(existingSubscription?.mercadoPagoPreapprovalId);
+    const subscription = syncedSubscription ?? existingSubscription;
     json(response, 200, { subscription });
   } catch {
     unauthorized(response, 'Entre novamente para verificar sua assinatura.');
@@ -386,10 +410,22 @@ async function handleSubscriptionCancel(request: VercelRequest, response: Vercel
 
   try {
     const user = await requireSessionUser(request);
+    const subscription = await getSubscription(user);
+
+    if (subscription?.mercadoPagoPreapprovalId && process.env.MERCADO_PAGO_ACCESS_TOKEN) {
+      await cancelMercadoPagoSubscription(subscription.mercadoPagoPreapprovalId);
+    }
+
     await cancelUserSubscription(user);
     json(response, 200, { status: 'active' });
-  } catch {
-    unauthorized(response, 'Entre novamente para cancelar a assinatura.');
+  } catch (error) {
+    if (error instanceof Error && error.message === 'AUTH_REQUIRED') {
+      unauthorized(response, 'Entre novamente para cancelar a assinatura.');
+      return;
+    }
+
+    console.error('Erro ao cancelar assinatura:', error);
+    json(response, 400, { error: 'Não foi possível cancelar a assinatura agora.' });
   }
 }
 
@@ -400,10 +436,87 @@ async function handleBillingCheckout(request: VercelRequest, response: VercelRes
   }
 
   try {
-    await requireSessionUser(request);
-    json(response, 503, { error: 'Checkout do Mercado Pago ainda não configurado.' });
-  } catch {
-    unauthorized(response, 'Entre novamente para assinar.');
+    const user = await requireSessionUser(request);
+    const appUrl = getAppUrl(request);
+    const existingSubscription = await getSubscription(user);
+    const syncedSubscription = await syncSubscriptionWithMercadoPago(existingSubscription?.mercadoPagoPreapprovalId);
+    const subscription = syncedSubscription ?? existingSubscription;
+
+    if (subscription?.status === 'active') {
+      json(response, 200, {
+        checkout: {
+          checkoutUrl: `${appUrl}/`,
+          preapprovalId: subscription.mercadoPagoPreapprovalId ?? '',
+          status: 'active',
+        },
+      });
+      return;
+    }
+
+    if (subscription?.status === 'pending' && subscription.mercadoPagoPreapprovalId) {
+      const preapproval = await getMercadoPagoSubscription(subscription.mercadoPagoPreapprovalId);
+      await updateSubscriptionFromMercadoPago(preapproval);
+      const checkoutUrl = getMercadoPagoCheckoutUrl(preapproval);
+
+      if (checkoutUrl) {
+        json(response, 200, {
+          checkout: {
+            checkoutUrl,
+            preapprovalId: preapproval.id,
+            status: 'pending',
+          },
+        });
+        return;
+      }
+    }
+
+    const preapproval = await createMercadoPagoSubscription(user, request);
+    const savedSubscription = await saveMercadoPagoSubscriptionForUser(user, preapproval);
+    json(response, 200, {
+      checkout: {
+        checkoutUrl: getMercadoPagoCheckoutUrl(preapproval),
+        preapprovalId: preapproval.id,
+        status: savedSubscription.status,
+      },
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === 'AUTH_REQUIRED') {
+      unauthorized(response, 'Entre novamente para assinar.');
+      return;
+    }
+
+    console.error('Erro ao criar checkout Mercado Pago:', error);
+    json(response, 400, { error: error instanceof Error ? error.message : 'Não foi possível iniciar o pagamento.' });
+  }
+}
+
+async function handleMercadoPagoWebhook(request: VercelRequest, response: VercelResponse) {
+  if (getMethod(request) !== 'POST') {
+    methodNotAllowed(response);
+    return;
+  }
+
+  try {
+    const body = await readJsonBody<Record<string, unknown>>(request);
+    const resourceId = extractMercadoPagoWebhookResourceId(request, body);
+
+    if (!resourceId) {
+      json(response, 200, { ok: true, ignored: true });
+      return;
+    }
+
+    if (!isMercadoPagoWebhookSignatureValid(request, resourceId)) {
+      console.error('Webhook Mercado Pago com assinatura inválida.');
+      json(response, 401, { error: 'Webhook inválido.' });
+      return;
+    }
+
+    const preapproval = await getMercadoPagoSubscription(resourceId);
+    await updateSubscriptionFromMercadoPago(preapproval);
+    json(response, 200, { ok: true });
+  } catch (error) {
+    console.error('Erro no webhook Mercado Pago:', error);
+    json(response, 500, { error: 'Não foi possível processar o webhook.' });
   }
 }
 
@@ -487,6 +600,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
   if (resource === 'subscription' && action === 'cancel') return handleSubscriptionCancel(request, response);
 
   if (resource === 'billing' && action === 'checkout') return handleBillingCheckout(request, response);
+  if (resource === 'mercado-pago' && action === 'webhook') return handleMercadoPagoWebhook(request, response);
 
   if (resource === 'mental-maps' && !action) return handleMentalMaps(request, response);
   if (resource === 'mental-maps' && action) return handleMentalMapById(request, response, action);

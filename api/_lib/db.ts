@@ -100,6 +100,9 @@ async function createSchema() {
     create table if not exists subscriptions (
       id text primary key,
       user_id text not null unique references profiles(id) on delete cascade,
+      mercado_pago_preapproval_id text,
+      mercado_pago_payer_id text,
+      mercado_pago_checkout_url text,
       status text not null default 'inactive',
       plan_name text not null default 'StudyFlow Premium',
       amount numeric not null default 11.90,
@@ -112,9 +115,14 @@ async function createSchema() {
     )
   `;
 
+  await sql`alter table subscriptions add column if not exists mercado_pago_preapproval_id text`;
+  await sql`alter table subscriptions add column if not exists mercado_pago_payer_id text`;
+  await sql`alter table subscriptions add column if not exists mercado_pago_checkout_url text`;
+
   await sql`create index if not exists study_sets_user_idx on study_sets(user_id)`;
   await sql`create index if not exists flashcards_user_set_idx on flashcards(user_id, study_set_id)`;
   await sql`create index if not exists mental_maps_user_idx on mental_maps(user_id)`;
+  await sql`create index if not exists subscriptions_preapproval_idx on subscriptions(mercado_pago_preapproval_id)`;
 }
 
 export async function upsertProfileFromSession(user: SessionUser) {

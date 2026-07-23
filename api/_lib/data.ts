@@ -1,6 +1,16 @@
 import { randomUUID } from 'node:crypto';
 import { sql } from '@vercel/postgres';
 import { ensureSchema } from './db.js';
+import type { AppSubscriptionStatus, MercadoPagoPreapproval } from './mercadoPago.js';
+import {
+  getMercadoPagoAmount,
+  getMercadoPagoCheckoutUrl,
+  getMercadoPagoCurrency,
+  getMercadoPagoNextPaymentDate,
+  getMercadoPagoPayerId,
+  getSubscriptionUserIdFromReference,
+  mapMercadoPagoStatus,
+} from './mercadoPago.js';
 import type { SessionUser } from './session.js';
 
 type StudySetIcon = 'language' | 'biology' | 'history' | 'math' | 'general';
@@ -48,8 +58,8 @@ function mapSubscription(row: Record<string, unknown>) {
   return {
     id: String(row.id),
     userId: String(row.user_id),
-    mercadoPagoPreapprovalId: null,
-    mercadoPagoPayerId: null,
+    mercadoPagoPreapprovalId: typeof row.mercado_pago_preapproval_id === 'string' ? row.mercado_pago_preapproval_id : null,
+    mercadoPagoPayerId: typeof row.mercado_pago_payer_id === 'string' ? row.mercado_pago_payer_id : null,
     status,
     planName: String(row.plan_name ?? 'StudyFlow Premium'),
     amount: Number(row.amount ?? 11.9),
@@ -59,6 +69,39 @@ function mapSubscription(row: Record<string, unknown>) {
     cancelledAt: row.cancelled_at ? new Date(String(row.cancelled_at)).toISOString() : null,
     createdAt: new Date(String(row.created_at)).toISOString(),
     updatedAt: new Date(String(row.updated_at)).toISOString(),
+  };
+}
+
+function addOneMonthIso() {
+  const date = new Date();
+  date.setMonth(date.getMonth() + 1);
+  return date.toISOString();
+}
+
+function getFallbackNextPaymentAt(status: AppSubscriptionStatus, value: string | null) {
+  if (value) return value;
+  if (status === 'active') return addOneMonthIso();
+  return null;
+}
+
+function getCancellationDate(status: AppSubscriptionStatus) {
+  if (status === 'cancelled' || status === 'rejected') return new Date().toISOString();
+  return null;
+}
+
+function mapPreapprovalToSubscriptionInput(preapproval: MercadoPagoPreapproval) {
+  const status = mapMercadoPagoStatus(preapproval.status);
+
+  return {
+    preapprovalId: preapproval.id,
+    payerId: getMercadoPagoPayerId(preapproval),
+    checkoutUrl: getMercadoPagoCheckoutUrl(preapproval),
+    status,
+    amount: getMercadoPagoAmount(preapproval),
+    currency: getMercadoPagoCurrency(preapproval),
+    startedAt: status === 'active' ? (preapproval.date_created ?? new Date().toISOString()) : null,
+    nextPaymentAt: getFallbackNextPaymentAt(status, getMercadoPagoNextPaymentDate(preapproval)),
+    cancelledAt: getCancellationDate(status),
   };
 }
 
@@ -299,6 +342,139 @@ export async function deleteMentalMapForUser(user: SessionUser, id: string) {
 export async function getSubscription(user: SessionUser) {
   await ensureSchema();
   const { rows } = await sql`select * from subscriptions where user_id = ${user.id} limit 1`;
+  return rows[0] ? mapSubscription(rows[0]) : null;
+}
+
+export async function saveMercadoPagoSubscriptionForUser(user: SessionUser, preapproval: MercadoPagoPreapproval) {
+  await ensureSchema();
+  const input = mapPreapprovalToSubscriptionInput(preapproval);
+  const subscriptionId = randomUUID();
+
+  const { rows } = await sql`
+    insert into subscriptions (
+      id,
+      user_id,
+      mercado_pago_preapproval_id,
+      mercado_pago_payer_id,
+      mercado_pago_checkout_url,
+      status,
+      plan_name,
+      amount,
+      currency,
+      started_at,
+      next_payment_at,
+      cancelled_at,
+      updated_at
+    )
+    values (
+      ${subscriptionId},
+      ${user.id},
+      ${input.preapprovalId},
+      ${input.payerId},
+      ${input.checkoutUrl},
+      ${input.status},
+      'StudyFlow Premium',
+      ${input.amount},
+      ${input.currency},
+      ${input.startedAt},
+      ${input.nextPaymentAt},
+      ${input.cancelledAt},
+      now()
+    )
+    on conflict (user_id) do update set
+      mercado_pago_preapproval_id = excluded.mercado_pago_preapproval_id,
+      mercado_pago_payer_id = excluded.mercado_pago_payer_id,
+      mercado_pago_checkout_url = excluded.mercado_pago_checkout_url,
+      status = excluded.status,
+      amount = excluded.amount,
+      currency = excluded.currency,
+      started_at = coalesce(subscriptions.started_at, excluded.started_at),
+      next_payment_at = excluded.next_payment_at,
+      cancelled_at = excluded.cancelled_at,
+      updated_at = now()
+    returning *
+  `;
+
+  return mapSubscription(rows[0]);
+}
+
+export async function updateSubscriptionFromMercadoPago(preapproval: MercadoPagoPreapproval) {
+  await ensureSchema();
+  const input = mapPreapprovalToSubscriptionInput(preapproval);
+  const referencedUserId = getSubscriptionUserIdFromReference(preapproval.external_reference);
+
+  if (referencedUserId) {
+    const { rows } = await sql`
+      insert into subscriptions (
+        id,
+        user_id,
+        mercado_pago_preapproval_id,
+        mercado_pago_payer_id,
+        mercado_pago_checkout_url,
+        status,
+        plan_name,
+        amount,
+        currency,
+        started_at,
+        next_payment_at,
+        cancelled_at,
+        updated_at
+      )
+      values (
+        ${randomUUID()},
+        ${referencedUserId},
+        ${input.preapprovalId},
+        ${input.payerId},
+        ${input.checkoutUrl},
+        ${input.status},
+        'StudyFlow Premium',
+        ${input.amount},
+        ${input.currency},
+        ${input.startedAt},
+        ${input.nextPaymentAt},
+        ${input.cancelledAt},
+        now()
+      )
+      on conflict (user_id) do update set
+        mercado_pago_preapproval_id = excluded.mercado_pago_preapproval_id,
+        mercado_pago_payer_id = excluded.mercado_pago_payer_id,
+        mercado_pago_checkout_url = excluded.mercado_pago_checkout_url,
+        status = excluded.status,
+        amount = excluded.amount,
+        currency = excluded.currency,
+        started_at = coalesce(subscriptions.started_at, excluded.started_at),
+        next_payment_at = excluded.next_payment_at,
+        cancelled_at = case
+          when excluded.status in ('cancelled', 'rejected') then coalesce(subscriptions.cancelled_at, excluded.cancelled_at)
+          when excluded.status = 'active' then null
+          else subscriptions.cancelled_at
+        end,
+        updated_at = now()
+      returning *
+    `;
+
+    return rows[0] ? mapSubscription(rows[0]) : null;
+  }
+
+  const { rows } = await sql`
+    update subscriptions
+    set mercado_pago_payer_id = ${input.payerId},
+        mercado_pago_checkout_url = ${input.checkoutUrl},
+        status = ${input.status},
+        amount = ${input.amount},
+        currency = ${input.currency},
+        started_at = coalesce(started_at, ${input.startedAt}),
+        next_payment_at = ${input.nextPaymentAt},
+        cancelled_at = case
+          when ${input.status} in ('cancelled', 'rejected') then coalesce(cancelled_at, ${input.cancelledAt})
+          when ${input.status} = 'active' then null
+          else cancelled_at
+        end,
+        updated_at = now()
+    where mercado_pago_preapproval_id = ${input.preapprovalId}
+    returning *
+  `;
+
   return rows[0] ? mapSubscription(rows[0]) : null;
 }
 
