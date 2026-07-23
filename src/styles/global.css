@@ -1299,3 +1299,532 @@ h1,h2,h3,p { margin-top: 0; }
     opacity:.72;
   }
 }
+
+/* Login layout intermediário mantido apenas por histórico; o bloco definitivo abaixo prevalece. */
+/*
+@media(min-width:901px){
+  html,
+  body{
+    overflow-x:hidden;
+  }
+
+  .login-screen{
+    width:100%;
+    min-height:100vh;
+    height:100vh;
+    display:grid;
+    grid-template-columns:minmax(0,1fr) 380px;
+    overflow:hidden;
+    background:#f7f8ff;
+  }
+
+  .login-showcase{
+    min-width:0;
+    min-height:100vh;
+    display:grid;
+    grid-template-columns:minmax(320px,.9fr) minmax(420px,1.1fr);
+    align-items:center;
+    gap:clamp(28px,4vw,64px);
+    padding:clamp(32px,5vw,80px);
+  }
+
+  .login-showcase::before{
+    inset:clamp(22px,3vw,34px);
+  }
+
+  .login-showcase__copy{
+    position:relative;
+    z-index:3;
+    max-width:650px;
+    margin:0;
+  }
+
+  .login-showcase__copy h1{
+    max-width:650px;
+    margin:18px 0;
+    font-size:clamp(3rem,5vw,5.2rem);
+    line-height:.95;
+    letter-spacing:-.055em;
+  }
+
+  .login-showcase__copy p{
+    max-width:520px;
+    font-size:1rem;
+    line-height:1.6;
+  }
+
+  .login-feature-row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:12px;
+    max-width:650px;
+    margin-top:30px;
+  }
+
+  .login-feature-row span{
+    min-width:max-content;
+  }
+
+  .study-illustration{
+    position:relative;
+    right:auto;
+    bottom:auto;
+    z-index:2;
+    width:min(100%,620px);
+    aspect-ratio:1.15;
+    height:auto;
+    margin:0 auto;
+    transform:none;
+    opacity:1;
+  }
+
+  .study-illustration__line--one{
+    inset:10% 8% 12% 4%;
+    transform:rotate(-8deg);
+  }
+
+  .study-illustration__line--two{
+    inset:19% 15% 9% 18%;
+    transform:rotate(12deg);
+  }
+
+  .study-float-card{
+    max-width:100%;
+  }
+
+  .study-float-card--main{
+    left:11%;
+    top:14%;
+    width:min(48%,270px);
+    min-height:156px;
+    transform:rotate(0deg);
+  }
+
+  .study-float-card--quiz{
+    right:7%;
+    top:27%;
+    width:min(39%,225px);
+    min-height:130px;
+    transform:rotate(3deg);
+  }
+
+  .study-float-card--progress{
+    right:18%;
+    bottom:9%;
+    width:min(38%,220px);
+    min-height:138px;
+    transform:rotate(-3deg);
+  }
+
+  .study-book-stack{
+    left:7%;
+    bottom:12%;
+    transform:scale(.9);
+    transform-origin:left bottom;
+  }
+
+  .floating-dot--one{left:6%;top:27%}
+  .floating-dot--two{right:18%;top:13%}
+  .floating-dot--three{left:48%;bottom:5%}
+  .floating-star--one{right:2%;bottom:33%}
+  .floating-star--two{left:38%;bottom:1%}
+
+  .login-panel{
+    width:380px;
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:40px;
+    background:#fff;
+    border-left:1px solid rgba(30,40,70,.08);
+    box-shadow:-18px 0 54px rgba(42,46,79,.07);
+  }
+
+  .login-panel .login-card{
+    width:100%;
+    max-width:320px;
+  }
+
+  .login-panel .login-card .flow-logo{
+    margin-bottom:40px;
+  }
+}
+
+@media(max-width:1200px) and (min-width:901px){
+  .login-screen{
+    grid-template-columns:minmax(0,1fr) clamp(340px,36vw,380px);
+  }
+
+  .login-showcase{
+    grid-template-columns:minmax(260px,.9fr) minmax(300px,1.1fr);
+    gap:24px;
+    padding:clamp(28px,4vw,48px);
+  }
+
+  .login-showcase__copy h1{
+    font-size:clamp(2.65rem,4.8vw,4.15rem);
+    letter-spacing:-.05em;
+  }
+
+  .login-showcase__copy p{
+    max-width:440px;
+    font-size:.95rem;
+  }
+
+  .login-feature-row span{
+    font-size:10px;
+    padding:0 11px;
+  }
+
+  .study-illustration{
+    width:min(100%,500px);
+  }
+
+  .study-float-card{
+    padding:15px;
+    border-radius:18px;
+  }
+
+  .study-float-card strong{
+    margin-top:11px;
+    font-size:17px;
+  }
+
+  .study-float-card p{
+    font-size:10px;
+  }
+
+  .login-panel{
+    width:auto;
+    padding:34px;
+  }
+}
+
+@media(max-width:900px){
+  html,
+  body{
+    overflow-x:hidden;
+  }
+
+  .login-screen{
+    display:grid;
+    grid-template-columns:1fr;
+    min-height:100svh;
+    height:auto;
+    overflow-x:hidden;
+    background:#fff;
+  }
+
+  .login-showcase{
+    display:none;
+  }
+
+  .login-panel{
+    width:100%;
+    min-height:100svh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:34px 24px;
+    border-left:0;
+    box-shadow:none;
+  }
+
+  .login-panel .login-card{
+    width:100%;
+    max-width:340px;
+    text-align:center;
+  }
+
+  .login-panel .login-card .flow-logo,
+  .login-panel .secure-copy{
+    justify-content:center;
+  }
+
+  .login-panel .google-button{
+    width:100%;
+  }
+}
+
+*/
+
+/* Login layout definitivo: corrige alinhamento, overflow e composição responsiva. */
+.login-screen{
+  width:100%;
+  min-height:100vh;
+  height:100vh;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 380px;
+  place-items:stretch;
+  padding:0;
+  overflow:hidden;
+  background:#f7f8ff;
+}
+
+.login-showcase{
+  position:relative;
+  min-width:0;
+  min-height:100vh;
+  display:grid;
+  grid-template-columns:minmax(320px,.9fr) minmax(420px,1.1fr);
+  align-items:center;
+  gap:clamp(28px,4vw,64px);
+  padding:clamp(32px,5vw,80px);
+  overflow:hidden;
+}
+
+.login-showcase__copy{
+  position:relative;
+  z-index:3;
+  width:100%;
+  max-width:650px;
+  margin:0;
+}
+
+.login-showcase__copy h1{
+  max-width:650px;
+  margin:18px 0;
+  font-size:clamp(3rem,5vw,5.2rem);
+  line-height:.95;
+  letter-spacing:-.055em;
+}
+
+.login-showcase__copy p{
+  max-width:520px;
+  font-size:1rem;
+  line-height:1.6;
+}
+
+.login-feature-row{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:12px;
+  max-width:650px;
+  margin-top:30px;
+}
+
+.login-feature-row span{
+  flex:0 1 auto;
+  white-space:nowrap;
+}
+
+.study-illustration{
+  position:relative;
+  right:auto;
+  bottom:auto;
+  z-index:2;
+  width:min(100%,620px);
+  aspect-ratio:1.15;
+  height:auto;
+  justify-self:center;
+  align-self:center;
+  margin:0 auto;
+  transform:none;
+  opacity:1;
+}
+
+.study-illustration__line--one{
+  inset:10% 8% 12% 4%;
+  transform:rotate(-8deg);
+}
+
+.study-illustration__line--two{
+  inset:19% 15% 9% 18%;
+  transform:rotate(12deg);
+}
+
+.study-book-stack{
+  left:7%;
+  bottom:12%;
+  transform:scale(.9);
+  transform-origin:left bottom;
+}
+
+.study-float-card{
+  box-sizing:border-box;
+  max-width:100%;
+}
+
+.study-float-card--main{
+  left:10%;
+  top:14%;
+  width:min(48%,270px);
+  min-height:156px;
+  transform:rotate(0deg);
+}
+
+.study-float-card--quiz{
+  right:7%;
+  top:27%;
+  width:min(39%,225px);
+  min-height:130px;
+  transform:rotate(3deg);
+}
+
+.study-float-card--progress{
+  right:18%;
+  bottom:9%;
+  width:min(38%,220px);
+  min-height:138px;
+  transform:rotate(-3deg);
+}
+
+.floating-dot--one{left:6%;top:27%}
+.floating-dot--two{right:18%;top:13%}
+.floating-dot--three{left:48%;bottom:5%}
+.floating-star--one{right:2%;bottom:33%}
+.floating-star--two{left:38%;bottom:1%}
+
+.login-panel{
+  width:380px;
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:40px;
+  background:#fff;
+  border-left:1px solid rgba(30,40,70,.08);
+  box-shadow:-18px 0 54px rgba(42,46,79,.07);
+}
+
+.login-panel .login-card{
+  width:100%;
+  max-width:320px;
+  padding:0;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+  text-align:left;
+}
+
+@media(max-width:1500px) and (min-width:1201px){
+  .login-showcase{
+    padding:clamp(42px,4.2vw,64px);
+  }
+
+  .login-showcase__copy h1{
+    font-size:clamp(3rem,4.15vw,4rem);
+  }
+
+  .study-illustration{
+    width:min(100%,560px);
+  }
+}
+
+@media(max-width:1200px) and (min-width:901px){
+  .login-screen{
+    grid-template-columns:minmax(0,1fr) clamp(340px,36vw,380px);
+  }
+
+  .login-showcase{
+    grid-template-columns:minmax(250px,1fr) minmax(200px,.85fr);
+    gap:22px;
+    padding:clamp(28px,4vw,48px);
+  }
+
+  .login-showcase__copy h1{
+    font-size:clamp(2.45rem,4.5vw,3.55rem);
+    letter-spacing:-.05em;
+  }
+
+  .login-showcase__copy p{
+    max-width:420px;
+    font-size:.94rem;
+  }
+
+  .login-feature-row{
+    gap:10px;
+    margin-top:24px;
+  }
+
+  .login-feature-row span{
+    min-height:36px;
+    padding:0 11px;
+    font-size:10px;
+  }
+
+  .study-illustration{
+    width:min(100%,500px);
+  }
+
+  .study-book-stack{
+    transform:scale(.72);
+  }
+
+  .study-float-card{
+    min-height:112px;
+    padding:14px;
+    border-radius:18px;
+  }
+
+  .study-float-card strong{
+    margin-top:10px;
+    font-size:16px;
+  }
+
+  .study-float-card p,
+  .study-float-card span{
+    font-size:9px;
+  }
+
+  .study-float-card--main{
+    width:52%;
+    min-height:132px;
+  }
+
+  .study-float-card--quiz{
+    width:43%;
+  }
+
+  .study-float-card--progress{
+    width:42%;
+  }
+
+  .login-panel{
+    width:auto;
+    padding:34px;
+  }
+}
+
+@media(max-width:900px){
+  .login-screen{
+    grid-template-columns:1fr;
+    min-height:100svh;
+    height:auto;
+    overflow-x:hidden;
+    background:#fff;
+  }
+
+  .login-showcase{
+    display:none;
+  }
+
+  .login-panel{
+    width:100%;
+    min-height:100svh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:34px 24px;
+    border-left:0;
+    box-shadow:none;
+  }
+
+  .login-panel .login-card{
+    width:100%;
+    max-width:340px;
+    text-align:center;
+  }
+
+  .login-panel .login-card .flow-logo,
+  .login-panel .secure-copy{
+    justify-content:center;
+  }
+
+  .login-panel .google-button{
+    width:100%;
+  }
+}
