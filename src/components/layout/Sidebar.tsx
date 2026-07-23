@@ -4,12 +4,11 @@ import { navigationItems } from './navigation';
 import { Logo } from '../logo/Logo';
 
 export function Sidebar({ activeView, onNavigate, name, avatarUrl, isPremium }: { activeView: ViewId; onNavigate: (view: ViewId) => void; name: string; avatarUrl?: string | null; isPremium: boolean }) {
-  const visibleItems = isPremium ? navigationItems : navigationItems.filter(({ id }) => id === 'billing' || id === 'profile');
   return (
     <aside className="sidebar">
       <button className="brand" onClick={() => onNavigate('home')} aria-label="Ir para o início"><Logo /></button>
       <nav aria-label="Navegação principal">
-        {visibleItems.map(({ id, label, icon: Icon }) => (
+        {navigationItems.map(({ id, label, icon: Icon }) => (
           <button key={id} className={activeView === id ? 'nav-item active' : 'nav-item'} onClick={() => onNavigate(id)}>
             <Icon size={20} /><span>{label}</span>
           </button>
