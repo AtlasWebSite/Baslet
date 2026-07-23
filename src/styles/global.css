@@ -1194,3 +1194,108 @@ h1,h2,h3,p { margin-top: 0; }
     text-align:center;
   }
 }
+
+/* Refinamento de posicionamento da tela de login. */
+@media(min-width:721px){
+  .login-screen{
+    grid-template-columns:minmax(0,70fr) minmax(390px,30fr);
+  }
+
+  .login-showcase{
+    padding:clamp(44px,5vw,72px) clamp(44px,6vw,88px);
+  }
+
+  .login-showcase::before{
+    inset:28px;
+  }
+
+  .login-showcase__copy{
+    max-width:min(620px,52vw);
+    margin-top:clamp(8px,2vh,18px);
+  }
+
+  .login-showcase__copy h1{
+    max-width:620px;
+    margin:18px 0 17px;
+    font-size:clamp(46px,5.15vw,70px);
+    line-height:1.03;
+    letter-spacing:-2.7px;
+  }
+
+  .login-showcase__copy p{
+    max-width:500px;
+    font-size:15px;
+    line-height:1.72;
+  }
+
+  .login-feature-row{
+    max-width:620px;
+    gap:12px;
+    margin-top:30px;
+  }
+
+  .study-illustration{
+    right:clamp(38px,5vw,78px);
+    bottom:clamp(30px,5vh,58px);
+    width:min(600px,50vw);
+    height:min(420px,46vh);
+  }
+
+  .study-float-card{
+    box-shadow:0 18px 48px rgba(45,50,84,.11);
+  }
+
+  .study-float-card--main{
+    left:18%;
+    top:10%;
+  }
+
+  .study-float-card--quiz{
+    right:4%;
+    top:24%;
+  }
+
+  .study-float-card--progress{
+    right:17%;
+    bottom:4%;
+  }
+
+  .study-book-stack{
+    left:8%;
+    bottom:8%;
+    transform:scale(.92);
+    transform-origin:left bottom;
+  }
+}
+
+@media(min-width:1181px){
+  .login-showcase__copy{
+    margin-left:clamp(6px,1vw,18px);
+  }
+
+  .study-illustration{
+    right:clamp(56px,7vw,112px);
+  }
+}
+
+@media(max-width:1180px) and (min-width:861px){
+  .login-screen{
+    grid-template-columns:minmax(0,60fr) minmax(380px,40fr);
+  }
+
+  .login-showcase__copy{
+    max-width:520px;
+  }
+
+  .login-showcase__copy h1{
+    font-size:clamp(42px,5vw,58px);
+    letter-spacing:-2px;
+  }
+
+  .study-illustration{
+    right:0;
+    bottom:24px;
+    width:min(500px,50vw);
+    opacity:.72;
+  }
+}
