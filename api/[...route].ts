@@ -453,23 +453,6 @@ async function handleBillingCheckout(request: VercelRequest, response: VercelRes
       return;
     }
 
-    if (subscription?.status === 'pending' && subscription.mercadoPagoPreapprovalId) {
-      const preapproval = await getMercadoPagoSubscription(subscription.mercadoPagoPreapprovalId);
-      await updateSubscriptionFromMercadoPago(preapproval);
-      const checkoutUrl = getMercadoPagoCheckoutUrl(preapproval);
-
-      if (checkoutUrl) {
-        json(response, 200, {
-          checkout: {
-            checkoutUrl,
-            preapprovalId: preapproval.id,
-            status: 'pending',
-          },
-        });
-        return;
-      }
-    }
-
     const preapproval = await createMercadoPagoSubscription(user, request);
     const savedSubscription = await saveMercadoPagoSubscriptionForUser(user, preapproval);
     json(response, 200, {

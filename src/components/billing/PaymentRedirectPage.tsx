@@ -40,6 +40,7 @@ export function PaymentRedirectPage({
   const [loginError, setLoginError] = useState('');
   const signInLock = useRef(false);
   const isActive = mode === 'active';
+  const isPending = subscription?.status === 'pending';
 
   const handleLogin = async () => {
     if (isSigningIn || signInLock.current) return;
@@ -75,7 +76,7 @@ export function PaymentRedirectPage({
       );
     }
 
-    return <BillingButton loading={isStarting} onClick={() => onSubscribe?.()}>Ir para pagamento</BillingButton>;
+    return <BillingButton loading={isStarting} onClick={() => onSubscribe?.()}>{isPending ? 'Pagar novamente' : 'Ir para pagamento'}</BillingButton>;
   })();
 
   return (

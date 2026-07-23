@@ -37,7 +37,7 @@ export function SubscriptionPaywall({
   const message = messages[status];
   const pending = status === 'pending';
   const actionLabel = pending
-    ? 'Aguardando confirmação'
+    ? 'Pagar novamente'
     : status === 'rejected'
       ? 'Tentar novamente'
       : status === 'cancelled' || status === 'paused'
@@ -54,7 +54,7 @@ export function SubscriptionPaywall({
         <h1>{message.title}</h1>
         <p>{message.text}</p>
         {errorMessage && <div className="billing-error" role="alert">{errorMessage}</div>}
-        <PricingCard action={<BillingButton loading={isStarting} disabled={pending} onClick={onSubscribe}>{actionLabel}</BillingButton>} />
+        <PricingCard action={<BillingButton loading={isStarting} onClick={onSubscribe}>{actionLabel}</BillingButton>} />
         {pending && <Button variant="secondary" icon={<RefreshCw size={16} />} loading={isRefreshing} onClick={onRefresh}>Verificar pagamento novamente</Button>}
         {showSignOut && <button className="billing-signout" onClick={onSignOut}><LogOut size={15} /> Sair da conta</button>}
       </section>
