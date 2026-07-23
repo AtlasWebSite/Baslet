@@ -4,7 +4,7 @@ import type { StudySet } from '../types';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Button } from '../components/ui/Button';
 
-export function FlashcardsView({ studySet, startCardId, studySets, onChange, onUpdate, onRate, onBack }: { studySet?: StudySet; startCardId?: string; studySets: StudySet[]; onChange: (studySet: StudySet) => void; onUpdate: (studySet: StudySet) => void; onRate: (studySet: StudySet, flashcardId: string, mastery: 1|2|3) => Promise<void>; onBack: () => void }) {
+export function FlashcardsView({ studySet, startCardId, studySets, isPremium, onRequirePremium, onChange, onUpdate, onRate, onBack }: { studySet?: StudySet; startCardId?: string; studySets: StudySet[]; isPremium: boolean; onRequirePremium: (message?: string) => void; onChange: (studySet: StudySet) => void; onUpdate: (studySet: StudySet) => void; onRate: (studySet: StudySet, flashcardId: string, mastery: 1|2|3) => Promise<void>; onBack: () => void }) {
   const [index, setIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [feedback, setFeedback] = useState<string>();
@@ -15,6 +15,18 @@ export function FlashcardsView({ studySet, startCardId, studySets, onChange, onU
     setFlipped(false);
   }, [studySet?.id, startCardId]);
   if (!studySet || !studySet.cards.length) return <div className="view"><EmptyState icon={<HelpCircle size={32} />} title="Nenhum flashcard disponível" description="Escolha um conjunto com termos para começar a estudar." action={<Button onClick={onBack}>Ver meus estudos</Button>} /></div>;
+  if (!isPremium) {
+    return (
+      <div className="view">
+        <EmptyState
+          icon={<Sparkles size={32} />}
+          title="Sessões de flashcards são Premium"
+          description="Você pode navegar pelo app e ver os conjuntos disponíveis, mas precisa assinar para estudar, virar cards e salvar progresso."
+          action={<Button onClick={() => onRequirePremium('Assine para liberar as sessões completas de flashcards.')}>Assinar para estudar</Button>}
+        />
+      </div>
+    );
+  }
 
   const currentCard = studySet.cards[index];
   const rate = (mastery: 1 | 2 | 3, message: string) => {

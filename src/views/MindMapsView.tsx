@@ -51,6 +51,11 @@ export function MindMapsView({ userId, studySets, isPremium, onRequirePremium, o
   };
 
   const generate = () => {
+    if (!isPremium) {
+      onRequirePremium('Assine para gerar mapas mentais automáticos a partir dos seus flashcards.');
+      return;
+    }
+
     if (!selectedSet) return;
     setGenerating(true);
     try {
@@ -66,6 +71,11 @@ export function MindMapsView({ userId, studySets, isPremium, onRequirePremium, o
   };
 
   const regenerate = () => {
+    if (!isPremium) {
+      onRequirePremium('Assine para regenerar mapas mentais avançados.');
+      return;
+    }
+
     const sourceSet = studySets.find((studySet) => studySet.id === selectedSetId);
     if (!sourceSet?.cards.length) {
       notify('error', 'O conjunto original não possui flashcards disponíveis.');

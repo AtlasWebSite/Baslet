@@ -81,7 +81,18 @@ function AuthenticatedApp({ user }: { user: NonNullable<ReturnType<typeof useAut
 
     setCreateOpen(true);
   };
-  const study = (set: StudySet, flashcardId?: string) => { setActiveSetId(set.id); setActiveCardId(flashcardId); navigate('flashcards'); };
+  const study = (set: StudySet, flashcardId?: string) => {
+    if (!billing.isPremium) {
+      setActiveSetId(set.id);
+      setActiveCardId(flashcardId);
+      requirePremium('Assine para iniciar sessões de estudo com flashcards.');
+      return;
+    }
+
+    setActiveSetId(set.id);
+    setActiveCardId(flashcardId);
+    navigate('flashcards');
+  };
   const saveSet = async (draft: Omit<StudySet, 'id'|'updatedAt'>) => { if (!billing.isPremium) { requirePremium('Assine para criar e salvar seus próprios conjuntos.'); return; } const created = await addStudySet(draft); setActiveSetId(created.id); setCreateOpen(false); notify('success', 'Conjunto salvo com segurança!'); navigate('studies'); };
   const rateCard = async (set: StudySet, cardId: string, mastery: 1|2|3) => { if (!billing.isPremium) { requirePremium('Assine para salvar seu progresso nos flashcards.'); throw new Error('Premium necessário.'); } await saveCardProgress(user.id, set, cardId, mastery); notify('success', 'Progresso sincronizado.'); };
   const clear = async () => { if (!billing.isPremium) { requirePremium('Assine para gerenciar seus dados de estudo.'); return; } if (!window.confirm('Excluir todos os seus conjuntos, flashcards e progresso? Esta ação não pode ser desfeita.')) return; await clearStudySets(); notify('info', 'Seus dados de estudo foram removidos.'); };
@@ -94,7 +105,7 @@ function AuthenticatedApp({ user }: { user: NonNullable<ReturnType<typeof useAut
   const premiumContent = () => {
     if (visibleView === 'home') return <>{starterWarning && <div className="starter-warning" role="status"><AlertTriangle size={17}/><span>{starterWarning}</span></div>}<HomeView studySets={filteredSets} onStudy={study} onNavigate={navigate} onCreate={openCreate}/></>;
     if (visibleView === 'studies') return <StudiesView studySets={filteredSets} onStudy={study} onCreate={openCreate}/>;
-    if (visibleView === 'flashcards') return <FlashcardsView studySet={activeSet} startCardId={activeCardId} studySets={studySets} onChange={study} onUpdate={updateStudySet} onRate={rateCard} onBack={() => navigate('studies')}/>;
+    if (visibleView === 'flashcards') return <FlashcardsView studySet={activeSet} startCardId={activeCardId} studySets={studySets} isPremium={billing.isPremium} onRequirePremium={requirePremium} onChange={study} onUpdate={updateStudySet} onRate={rateCard} onBack={() => navigate('studies')}/>;
     if (visibleView === 'mindmaps') return <MindMapsView userId={user.id} studySets={studySets} isPremium={billing.isPremium} onRequirePremium={requirePremium} onCreateSet={openCreate} onStudyFlashcard={study} notify={notify}/>;
     if (visibleView === 'quiz') return <QuizView studySets={studySets} userId={user.id} isPremium={billing.isPremium} onRequirePremium={requirePremium} onError={(message) => notify('error', message)}/>;
     return <ProgressView studySets={studySets}/>;

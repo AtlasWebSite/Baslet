@@ -1,4 +1,4 @@
-import { Check, CheckCircle2, CircleX, Layers3, PartyPopper, RotateCcw, Shuffle } from 'lucide-react';
+import { Check, CheckCircle2, CircleX, Layers3, PartyPopper, RotateCcw, Shuffle, Sparkles } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type { StudySet } from '../types';
 import { Button } from '../components/ui/Button';
@@ -59,6 +59,20 @@ export function QuizView({ studySets, userId, isPremium, onRequirePremium, onErr
 
   if (!setsWithCards.length) {
     return <div className="view"><EmptyState icon={<CircleX size={32} />} title="Teste indisponível" description="Crie um conjunto com flashcards para gerar seu primeiro teste." /></div>;
+  }
+
+  if (!isPremium) {
+    return (
+      <div className="view quiz-view">
+        <QuizSetSelector studySets={setsWithCards} selectedSetId={selectedSetId || setsWithCards[0].id} onChange={changeSet} />
+        <EmptyState
+          icon={<Sparkles size={32} />}
+          title="Testes completos são Premium"
+          description="Você pode ver os conteúdos disponíveis, mas precisa assinar para responder testes e salvar resultados."
+          action={<Button onClick={() => onRequirePremium('Assine para liberar testes completos e salvar seus resultados.')}>Assinar para testar</Button>}
+        />
+      </div>
+    );
   }
 
   if (!questions.length || !selectedSet) {
