@@ -16,6 +16,12 @@ interface MercadoPagoErrorResponse {
   cause?: unknown;
 }
 
+export class MercadoPagoIntegrationError extends Error {
+  constructor(message: string, public code: 'same_payer_and_collector' | 'unavailable' = 'unavailable') {
+    super(message);
+  }
+}
+
 export interface MercadoPagoPreapproval {
   id: string;
   status: string;
@@ -80,7 +86,27 @@ async function mercadoPagoRequest<T>(path: string, init?: RequestInit) {
   if (response.ok) return payload;
 
   console.error('Erro Mercado Pago:', response.status, payload);
-  throw new Error(payload.message || payload.error || 'Mercado Pago não conseguiu processar a solicitação.');
+  const rawMessage = payload.message || payload.error || 'Mercado Pago não conseguiu processar a solicitação.';
+
+  if (/payer and collector cannot be the same user/i.test(rawMessage)) {
+    throw new MercadoPagoIntegrationError(
+      'Use uma conta compradora diferente da conta Mercado Pago que recebe o dinheiro. Em testes, configure MERCADO_PAGO_TEST_PAYER_EMAIL com o e-mail de um comprador de teste.',
+      'same_payer_and_collector',
+    );
+  }
+
+  throw new MercadoPagoIntegrationError(rawMessage);
+}
+
+function isTestAccessToken() {
+  return getAccessToken().startsWith('TEST-');
+}
+
+function getPayerEmail(user: SessionUser) {
+  const testPayerEmail = process.env.MERCADO_PAGO_TEST_PAYER_EMAIL?.trim();
+  if (isTestAccessToken() && testPayerEmail) return testPayerEmail;
+
+  return user.email;
 }
 
 export function mapMercadoPagoStatus(status?: string | null): AppSubscriptionStatus {
@@ -135,7 +161,7 @@ export async function createMercadoPagoSubscription(user: SessionUser, request: 
     body: JSON.stringify({
       reason: PLAN_NAME,
       external_reference: `studyflow:user:${user.id}`,
-      payer_email: user.email,
+      payer_email: getPayerEmail(user),
       auto_recurring: {
         frequency: 1,
         frequency_type: 'months',
