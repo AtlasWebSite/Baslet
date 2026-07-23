@@ -136,6 +136,10 @@ export function getMercadoPagoNextPaymentDate(preapproval: MercadoPagoPreapprova
 }
 
 export function getMercadoPagoCheckoutUrl(preapproval: MercadoPagoPreapproval) {
+  if (isTestAccessToken()) {
+    return preapproval.sandbox_init_point ?? preapproval.init_point ?? '';
+  }
+
   return preapproval.init_point ?? preapproval.sandbox_init_point ?? '';
 }
 
