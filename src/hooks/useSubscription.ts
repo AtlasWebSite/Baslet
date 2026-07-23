@@ -1,61 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Subscription } from '../types/subscription';
-import { cancelSubscription, getUserSubscription } from '../services/billingService';
-
-const TEMPORARY_PREMIUM_KEY = 'studyflow-temporary-premium-users';
-
-function getTemporaryPremiumUsers() {
-  try {
-    const storedUsers = localStorage.getItem(TEMPORARY_PREMIUM_KEY);
-    if (!storedUsers) return [];
-
-    const parsedUsers = JSON.parse(storedUsers);
-    if (!Array.isArray(parsedUsers)) return [];
-
-    return parsedUsers.filter((user): user is string => typeof user === 'string');
-  } catch (error) {
-    console.error('Não foi possível ler o Premium temporário:', error);
-    return [];
-  }
-}
-
-function hasTemporaryPremiumAccess(userId: string) {
-  return getTemporaryPremiumUsers().includes(userId);
-}
-
-function saveTemporaryPremiumAccess(userId: string) {
-  const users = getTemporaryPremiumUsers();
-  if (users.includes(userId)) return;
-
-  localStorage.setItem(TEMPORARY_PREMIUM_KEY, JSON.stringify([...users, userId]));
-}
-
-function removeTemporaryPremiumAccess(userId: string) {
-  const users = getTemporaryPremiumUsers().filter((currentUserId) => currentUserId !== userId);
-  localStorage.setItem(TEMPORARY_PREMIUM_KEY, JSON.stringify(users));
-}
-
-function createTemporarySubscription(userId: string): Subscription {
-  const now = new Date();
-  const nextMonth = new Date(now);
-  nextMonth.setMonth(nextMonth.getMonth() + 1);
-
-  return {
-    id: `temporary-${userId}`,
-    userId,
-    mercadoPagoPreapprovalId: null,
-    mercadoPagoPayerId: null,
-    status: 'active',
-    planName: 'StudyFlow Premium',
-    amount: 11.9,
-    currency: 'BRL',
-    startedAt: now.toISOString(),
-    nextPaymentAt: nextMonth.toISOString(),
-    cancelledAt: null,
-    createdAt: now.toISOString(),
-    updatedAt: now.toISOString(),
-  };
-}
+import {
+  cancelSubscription,
+  createCheckoutSession,
+  getUserSubscription,
+  openBillingPayment,
+} from '../services/billingService';
 
 export function useSubscription(userId: string) {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
@@ -64,7 +14,6 @@ export function useSubscription(userId: string) {
   const [isCancelling, setIsCancelling] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [hasTemporaryAccess, setHasTemporaryAccess] = useState(() => hasTemporaryPremiumAccess(userId));
 
   const refresh = useCallback(async () => {
     setIsRefreshing(true);
@@ -82,10 +31,6 @@ export function useSubscription(userId: string) {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [userId]);
-
-  useEffect(() => {
-    setHasTemporaryAccess(hasTemporaryPremiumAccess(userId));
   }, [userId]);
 
   useEffect(() => {
@@ -110,11 +55,11 @@ export function useSubscription(userId: string) {
     setErrorMessage('');
 
     try {
-      saveTemporaryPremiumAccess(userId);
-      setHasTemporaryAccess(true);
+      const checkout = await createCheckoutSession();
+      openBillingPayment(checkout.checkoutUrl);
     } catch (error) {
-      console.error('Erro ao liberar Premium temporário:', error);
-      setErrorMessage('Não foi possível liberar o acesso temporário.');
+      console.error('Erro ao iniciar pagamento:', error);
+      setErrorMessage(error instanceof Error ? error.message : 'Não foi possível iniciar o pagamento.');
     } finally {
       setIsStarting(false);
     }
@@ -127,12 +72,6 @@ export function useSubscription(userId: string) {
     setErrorMessage('');
 
     try {
-      if (hasTemporaryAccess && subscription?.status !== 'active') {
-        removeTemporaryPremiumAccess(userId);
-        setHasTemporaryAccess(false);
-        return;
-      }
-
       await cancelSubscription();
       await refresh();
     } catch (error) {
@@ -142,19 +81,14 @@ export function useSubscription(userId: string) {
     }
   };
 
-  const isPremium = hasTemporaryAccess || subscription?.status === 'active';
-  const visibleSubscription = hasTemporaryAccess && subscription?.status !== 'active'
-    ? createTemporarySubscription(userId)
-    : subscription;
-
   return {
-    subscription: visibleSubscription,
+    subscription,
     isLoading,
     isRefreshing,
     isStarting,
     isCancelling,
     errorMessage,
-    isPremium,
+    isPremium: subscription?.status === 'active',
     refresh,
     startSubscription,
     cancel,

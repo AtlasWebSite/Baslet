@@ -14,12 +14,14 @@ import { Button } from '../components/ui/Button';
 interface MindMapsViewProps {
   userId: string;
   studySets: StudySet[];
+  isPremium: boolean;
+  onRequirePremium: (message?: string) => void;
   onCreateSet: () => void;
   onStudyFlashcard: (studySet: StudySet, flashcardId: string) => void;
   notify: (type: ToastMessage['type'], message: string) => void;
 }
 
-export function MindMapsView({ userId, studySets, onCreateSet, onStudyFlashcard, notify }: MindMapsViewProps) {
+export function MindMapsView({ userId, studySets, isPremium, onRequirePremium, onCreateSet, onStudyFlashcard, notify }: MindMapsViewProps) {
   const { maps, isLoading, error, saveMap, saveChanges, removeMap } = useMentalMaps(userId);
   const [selectedSetId, setSelectedSetId] = useState('');
   const [nodes, setNodes] = useState<MindMapNode[]>([]);
@@ -110,6 +112,11 @@ export function MindMapsView({ userId, studySets, onCreateSet, onStudyFlashcard,
 
   const save = async () => {
     if (!selectedSetId || !nodes.length) return;
+    if (!isPremium) {
+      onRequirePremium('Você pode gerar mapas para testar, mas precisa assinar para salvar mapas mentais.');
+      return;
+    }
+
     setSaving(true);
     try {
       if (activeMap) {
@@ -129,6 +136,11 @@ export function MindMapsView({ userId, studySets, onCreateSet, onStudyFlashcard,
   };
 
   const remove = async (map: MentalMap) => {
+    if (!isPremium) {
+      onRequirePremium('Assine para gerenciar e excluir mapas salvos.');
+      return;
+    }
+
     if (!window.confirm(`Excluir o mapa “${map.title}”?`)) return;
     try {
       await removeMap(map.id);

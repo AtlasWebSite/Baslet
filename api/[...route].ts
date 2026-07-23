@@ -372,13 +372,7 @@ async function handleBillingCheckout(request: VercelRequest, response: VercelRes
 
   try {
     await requireSessionUser(request);
-    json(response, 200, {
-      checkout: {
-        checkoutUrl: '/',
-        preapprovalId: 'temporary-vercel-bypass',
-        status: 'pending',
-      },
-    });
+    json(response, 503, { error: 'Checkout do Mercado Pago ainda não configurado.' });
   } catch {
     unauthorized(response, 'Entre novamente para assinar.');
   }

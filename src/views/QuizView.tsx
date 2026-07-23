@@ -30,7 +30,7 @@ function createQuestions(studySet?: StudySet) {
   });
 }
 
-export function QuizView({ studySets, userId, onError }: { studySets: StudySet[]; userId: string; onError: (message: string) => void }) {
+export function QuizView({ studySets, userId, isPremium, onRequirePremium, onError }: { studySets: StudySet[]; userId: string; isPremium: boolean; onRequirePremium: (message?: string) => void; onError: (message: string) => void }) {
   const setsWithCards = useMemo(() => studySets.filter((studySet) => studySet.cards.length > 0), [studySets]);
   const [selectedSetId, setSelectedSetId] = useState(() => setsWithCards[0]?.id ?? '');
   const selectedSet = setsWithCards.find((studySet) => studySet.id === selectedSetId) ?? setsWithCards[0];
@@ -89,6 +89,11 @@ export function QuizView({ studySets, userId, onError }: { studySets: StudySet[]
 
     setFinished(true);
     const finalScore = score;
+    if (!isPremium) {
+      onRequirePremium('Você pode fazer o teste de demonstração, mas precisa assinar para salvar resultados e progresso.');
+      return;
+    }
+
     void saveQuizResult(userId, selectedSet.id, finalScore, questions.length).catch((reason: Error) => onError(reason.message));
   };
 
