@@ -138,6 +138,10 @@ h1,h2,h3,p { margin-top: 0; }
 .premium-window .subscription-hero{max-width:540px}
 .premium-window .subscription-hero__icon{display:none}
 .premium-window .subscription-hero>h1,.premium-window .subscription-hero>p{display:none}
+.modal--premium{position:relative;width:min(590px,calc(100vw - 28px));overflow:visible;background:transparent;border-radius:0;box-shadow:none}
+.modal--premium .premium-window .subscription-page{padding:0}
+.modal--premium .pricing-card{box-shadow:0 28px 80px rgba(21,24,42,.28)}
+.modal__floating-close{position:absolute;right:-12px;top:-12px;z-index:4;background:#fff!important;border:1px solid #e3e4ef!important;box-shadow:0 14px 34px rgba(27,30,51,.18)}
 .premium-action-button svg,.premium-action-inline svg{color:#7a5de8}
 .premium-action-inline{gap:5px!important;background:#f0edff!important;color:#6758df!important}
 .level-badge--premium{color:#6555cf!important;background:#efedff!important}.sidebar-user small{display:flex;align-items:center;gap:4px}
@@ -245,6 +249,10 @@ h1,h2,h3,p { margin-top: 0; }
 @media (max-width:560px){
   .modal-backdrop{align-items:end;place-items:end stretch;padding:0;background:rgba(25,28,45,.5)}
   .modal{width:100%;max-height:92vh;border-radius:24px 24px 0 0}
+  .modal--premium{width:min(430px,calc(100vw - 22px));max-height:90vh;margin:auto;border-radius:0;background:transparent}
+  .modal--premium .pricing-card{max-height:88vh;overflow:auto}
+  .modal--premium .premium-benefits{grid-template-columns:1fr}
+  .modal--premium .modal__floating-close{right:0;top:-14px}
   .modal__header{position:sticky;top:0;z-index:2;background:#fff;padding:18px;border-bottom:1px solid var(--line)}
   .modal__header h2{font-size:19px;line-height:1.2}
   .create-form{padding:18px}
