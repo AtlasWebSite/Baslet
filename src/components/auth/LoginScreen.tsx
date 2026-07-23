@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { LockKeyhole, Sparkles } from 'lucide-react';
+import { BarChart3, BookOpen, BrainCircuit, CheckCircle2, Layers3, LockKeyhole, Sparkles } from 'lucide-react';
 import { signInWithGoogle } from '../../services/authService';
 import { Button } from '../ui/Button';
 import { Logo } from '../logo/Logo';
@@ -48,32 +48,74 @@ export function LoginScreen() {
 
   return (
     <main className="login-screen">
-      <div className="auth-shape auth-shape--one" />
-      <div className="auth-shape auth-shape--two" />
-      <section className="login-card">
-        <Logo />
-        <div className="login-visual">
-          <div className="mini-card mini-card--back" />
-          <div className="mini-card"><Sparkles size={24} /><span>Aprenda no seu ritmo</span><div><i /><i /><i /></div></div>
+      <section className="login-showcase" aria-labelledby="login-showcase-title">
+        <div className="login-showcase__orb login-showcase__orb--one" />
+        <div className="login-showcase__orb login-showcase__orb--two" />
+
+        <div className="login-showcase__copy">
+          <span className="eyebrow"><Sparkles size={14} /> StudyFlow</span>
+          <h1 id="login-showcase-title">Estude melhor.<br />Organize seu progresso.</h1>
+          <p>Crie flashcards, pratique com testes e acompanhe sua evolução em um só lugar.</p>
+
+          <div className="login-feature-row" aria-label="Recursos do StudyFlow">
+            <span><Layers3 size={16} /> Flashcards inteligentes</span>
+            <span><BrainCircuit size={16} /> Testes personalizados</span>
+            <span><BarChart3 size={16} /> Progresso organizado</span>
+          </div>
         </div>
-        <span className="eyebrow">SEU ESPAÇO DE APRENDIZADO</span>
-        <h1>Estude melhor,<br />organize seu progresso</h1>
-        <p>Entre com sua conta Google para salvar seus flashcards, testes e evolução.</p>
-        {errorMessage && <div className="login-error" role="alert">{errorMessage}</div>}
-        <Button
-          type="button"
-          className="google-button"
-          variant="secondary"
-          icon={<GoogleMark />}
-          loading={isSigningIn}
-          disabled={isSigningIn}
-          onClick={handleGoogleLogin}
-        >
-          {isSigningIn ? 'Abrindo Google...' : 'Entrar com Google'}
-        </Button>
-        <div className="secure-copy"><LockKeyhole size={15} /><span>Seus estudos ficam protegidos e vinculados somente à sua conta.</span></div>
+
+        <div className="study-illustration" aria-hidden="true">
+          <div className="study-illustration__line study-illustration__line--one" />
+          <div className="study-illustration__line study-illustration__line--two" />
+          <div className="study-book-stack"><i /><i /><i /></div>
+          <div className="floating-dot floating-dot--one" />
+          <div className="floating-dot floating-dot--two" />
+          <div className="floating-dot floating-dot--three" />
+          <div className="floating-star floating-star--one"><Sparkles size={18} /></div>
+          <div className="floating-star floating-star--two"><CheckCircle2 size={17} /></div>
+
+          <article className="study-float-card study-float-card--main">
+            <span><BookOpen size={18} /> Flashcard</span>
+            <strong>Conceito</strong>
+            <p>Definição resumida para revisar.</p>
+            <div><i /><i /><i /></div>
+          </article>
+
+          <article className="study-float-card study-float-card--quiz">
+            <span><BrainCircuit size={18} /> Teste rápido</span>
+            <strong>Revisão guiada</strong>
+            <p>Perguntas para praticar melhor.</p>
+          </article>
+
+          <article className="study-float-card study-float-card--progress">
+            <span><BarChart3 size={18} /> Progresso</span>
+            <strong>Evolução</strong>
+            <div className="study-progress-bars"><i /><i /><i /><i /></div>
+          </article>
+        </div>
       </section>
-      <footer>Ao entrar, você concorda com o uso seguro dos seus dados para a experiência do app.</footer>
+
+      <aside className="login-panel">
+        <section className="login-card" aria-labelledby="login-title">
+          <Logo />
+          <span className="eyebrow">SEU ESPAÇO DE APRENDIZADO</span>
+          <h1 id="login-title">Bem-vindo ao StudyFlow</h1>
+          <p>Entre para acessar seus estudos, flashcards, testes e progresso.</p>
+          {errorMessage && <div className="login-error" role="alert">{errorMessage}</div>}
+          <Button
+            type="button"
+            className="google-button"
+            variant="secondary"
+            icon={<GoogleMark />}
+            loading={isSigningIn}
+            disabled={isSigningIn}
+            onClick={handleGoogleLogin}
+          >
+            {isSigningIn ? 'Abrindo Google...' : 'Entrar com Google'}
+          </Button>
+          <div className="secure-copy"><LockKeyhole size={15} /><span>Seus estudos ficam protegidos e vinculados somente à sua conta.</span></div>
+        </section>
+      </aside>
     </main>
   );
 }
