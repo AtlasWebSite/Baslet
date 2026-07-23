@@ -1,5 +1,16 @@
 import { randomBytes } from 'node:crypto';
+import { ZodError } from 'zod';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { aiGenerationRequestSchema, AiValidationError, type AiContentType } from './_lib/aiSchemas.js';
+import {
+  acquireAiGenerationLock,
+  AiUsageError,
+  assertAiUsageAvailable,
+  getAiUsageSnapshot,
+  recordAiGeneration,
+  registerAiRateEvent,
+  releaseAiGenerationLock,
+} from './_lib/aiUsage.js';
 import {
   cancelUserSubscription,
   completeProfileOnboarding,
@@ -30,6 +41,7 @@ import {
   getMercadoPagoSubscription,
   isMercadoPagoWebhookSignatureValid,
 } from './_lib/mercadoPago.js';
+import { generateContentWithKimi } from './_lib/kimiClient.js';
 import {
   clearSessionCookie,
   getSessionUser,
@@ -561,6 +573,89 @@ async function handleMentalMapById(request: VercelRequest, response: VercelRespo
   }
 }
 
+function getAiErrorMessage(error: unknown) {
+  if (error instanceof ZodError) return 'Digite um tema válido para continuar.';
+  if (error instanceof AiUsageError && error.code === 'limit_exceeded') return 'Você atingiu o limite de gerações com IA do seu plano.';
+  if (error instanceof AiUsageError && error.code === 'rate_limited') return 'Você fez muitas solicitações. Aguarde um momento e tente novamente.';
+  if (error instanceof AiUsageError && error.code === 'already_running') return 'Você fez muitas solicitações. Aguarde um momento e tente novamente.';
+  if (error instanceof AiValidationError) return error.message;
+  if (error instanceof Error && /timeout/i.test(error.message)) return 'A inteligência artificial demorou mais que o esperado. Tente novamente.';
+  return 'A geração com IA está temporariamente indisponível.';
+}
+
+function getAiErrorStatus(error: unknown) {
+  if (error instanceof ZodError) return 400;
+  if (error instanceof AiUsageError && error.code === 'limit_exceeded') return 403;
+  if (error instanceof AiUsageError) return 429;
+  if (error instanceof AiValidationError) return 502;
+  return 503;
+}
+
+async function handleAiGenerateStudyContent(request: VercelRequest, response: VercelResponse) {
+  if (getMethod(request) !== 'POST') {
+    methodNotAllowed(response);
+    return;
+  }
+
+  let user: SessionUser;
+  let contentType: AiContentType | undefined;
+  let topic = '';
+  let lockAcquired = false;
+
+  try {
+    user = await requireSessionUser(request);
+  } catch {
+    unauthorized(response, 'Entre na sua conta para usar a geração com IA.');
+    return;
+  }
+
+  try {
+    const body = await readJsonBody<unknown>(request);
+    const parsed = aiGenerationRequestSchema.parse(body);
+    contentType = parsed.type;
+    topic = parsed.topic;
+
+    await assertAiUsageAvailable(user);
+    await registerAiRateEvent(user);
+    await acquireAiGenerationLock(user);
+    lockAcquired = true;
+
+    const generated = await generateContentWithKimi(contentType, topic);
+    const generationId = await recordAiGeneration({
+      user,
+      contentType,
+      topic,
+      model: generated.model,
+      promptTokens: generated.usage.promptTokens,
+      completionTokens: generated.usage.completionTokens,
+      totalTokens: generated.usage.totalTokens,
+      status: 'success',
+    });
+    const usage = await getAiUsageSnapshot(user);
+
+    json(response, 200, {
+      generationId,
+      content: generated.content,
+      usage,
+    });
+  } catch (error) {
+    if (contentType && topic) {
+      await recordAiGeneration({
+        user,
+        contentType,
+        topic,
+        model: process.env.KIMI_MODEL ?? 'kimi-k3',
+        status: 'failed',
+      }).catch(() => undefined);
+    }
+
+    console.error('Falha segura na geração com IA:', error instanceof Error ? error.message : 'erro desconhecido');
+    json(response, getAiErrorStatus(error), { error: getAiErrorMessage(error) });
+  } finally {
+    if (lockAcquired) await releaseAiGenerationLock(user).catch(() => undefined);
+  }
+}
+
 export default async function handler(request: VercelRequest, response: VercelResponse) {
   const [resource, action] = getRouteSegments(request);
 
@@ -587,6 +682,8 @@ export default async function handler(request: VercelRequest, response: VercelRe
 
   if (resource === 'mental-maps' && !action) return handleMentalMaps(request, response);
   if (resource === 'mental-maps' && action) return handleMentalMapById(request, response, action);
+
+  if (resource === 'ai' && action === 'generate-study-content') return handleAiGenerateStudyContent(request, response);
 
   routeNotFound(response);
 }

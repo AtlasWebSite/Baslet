@@ -14,14 +14,18 @@ import { SubscriptionPaywall } from './components/billing/SubscriptionPaywall';
 import { SubscriptionStatusCard } from './components/billing/SubscriptionStatusCard';
 import { PaymentStatusScreen } from './components/billing/PaymentStatusScreen';
 import { PaymentRedirectPage } from './components/billing/PaymentRedirectPage';
+import { AiCreationModal } from './components/ai/AiCreationModal';
 import { Button } from './components/ui/Button';
 import { useAuth } from './hooks/useAuth';
 import { useProfile } from './hooks/useProfile';
 import { useStudySets } from './hooks/useStudySets';
 import { useSubscription } from './hooks/useSubscription';
 import { signOut } from './services/authService';
+import { createMentalMap } from './services/mentalMapService';
 import { saveCardProgress } from './services/progressService';
 import type { StudySet, ToastMessage, ViewId } from './types';
+import type { AiContentType, AiFlashcardsContent, AiMindMapContent } from './types/ai';
+import type { MindMapEdge, MindMapMode, MindMapNode } from './types/mentalMap';
 import type { PaymentReturnStatus } from './types/subscription';
 import { newId } from './utils/study';
 import { HomeView } from './views/HomeView';
@@ -45,6 +49,82 @@ function getPaymentReturnStatus(pathname: string): PaymentReturnStatus | undefin
 
 function isPaymentRedirectPath(pathname: string) {
   return ['/pagamento', '/pagamento/', '/checkout', '/checkout/', '/payment', '/payment/'].includes(pathname);
+}
+
+function composeAiFlashcardDefinition(card: AiFlashcardsContent['cards'][number]) {
+  const answer = card.back.trim();
+  const explanation = card.explanation.trim();
+  if (!explanation) return answer;
+  return `${answer}\n\nExplicação: ${explanation}`;
+}
+
+function createAiFlashcardsDraft(content: AiFlashcardsContent, generationId: string): Omit<StudySet, 'id' | 'updatedAt'> {
+  return {
+    title: content.title.trim(),
+    subject: content.topic.trim() || 'IA',
+    description: content.description.trim() || `Conteúdo gerado com IA sobre ${content.topic}.`,
+    color: '#6758e8',
+    icon: 'general',
+    createdByAi: true,
+    aiTopic: content.topic,
+    aiGenerationId: generationId,
+    cards: content.cards
+      .filter((card) => card.front.trim() && card.back.trim())
+      .map((card) => ({
+        id: newId('ai-card'),
+        term: card.front.trim(),
+        definition: composeAiFlashcardDefinition(card),
+        mastery: 0,
+      })),
+  };
+}
+
+function getNodeDefinition(node: MindMapNode, nodes: MindMapNode[], edges: MindMapEdge[]) {
+  const directDefinition = nodes.find((candidate) => {
+    if (candidate.type !== 'definition') return false;
+    return edges.some((edge) => edge.source === node.id && edge.target === candidate.id);
+  });
+
+  return directDefinition?.fullText || node.fullText || node.subtitle || node.label;
+}
+
+function prepareAiMindMapForSaving(nodes: MindMapNode[], edges: MindMapEdge[]) {
+  const termNodes = nodes.filter((node) => node.type === 'term');
+  const cardIdByTermId = new Map<string, string>();
+
+  for (const termNode of termNodes) {
+    cardIdByTermId.set(termNode.id, termNode.flashcardId || newId('ai-card'));
+  }
+
+  const parentByTarget = new Map(edges.map((edge) => [edge.target, edge.source]));
+  const findRelatedTermId = (node: MindMapNode) => {
+    if (node.type === 'term') return node.id;
+
+    let parentId = parentByTarget.get(node.id);
+    while (parentId) {
+      const parentNode = nodes.find((candidate) => candidate.id === parentId);
+      if (!parentNode) return undefined;
+      if (parentNode.type === 'term') return parentNode.id;
+      parentId = parentByTarget.get(parentNode.id);
+    }
+
+    return undefined;
+  };
+
+  const normalizedNodes = nodes.map((node) => {
+    const relatedTermId = findRelatedTermId(node);
+    const flashcardId = relatedTermId ? cardIdByTermId.get(relatedTermId) : node.flashcardId;
+    return flashcardId ? { ...node, flashcardId } : node;
+  });
+
+  const cards = termNodes.map((termNode) => ({
+    id: cardIdByTermId.get(termNode.id) ?? newId('ai-card'),
+    term: termNode.label.trim() || 'Conceito',
+    definition: getNodeDefinition(termNode, normalizedNodes, edges).trim() || termNode.fullText,
+    mastery: 0 as const,
+  }));
+
+  return { nodes: normalizedNodes, cards };
 }
 
 export function App() {
@@ -86,6 +166,7 @@ function AuthenticatedApp({ user }: { user: NonNullable<ReturnType<typeof useAut
   const { studySets, isLoading: setsLoading, error: setsError, starterSetsCreated, starterWarning, addStudySet, updateStudySet, clearStudySets, clearSensitiveState } = useStudySets(user.id, true);
   const [activeView, setActiveView] = useState<ViewId>(INITIAL_VIEW); const [activeSetId, setActiveSetId] = useState<string>(); const [activeCardId, setActiveCardId] = useState<string>();
   const [search, setSearch] = useState(''); const [createOpen, setCreateOpen] = useState(false); const [premiumOpen, setPremiumOpen] = useState(false); const [replayTutorial, setReplayTutorial] = useState(false); const [onboardingBypassed, setOnboardingBypassed] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false); const [aiInitialType, setAiInitialType] = useState<AiContentType>('flashcards'); const [aiSaving, setAiSaving] = useState(false); const [mindMapsVersion, setMindMapsVersion] = useState(0);
   const [toast, setToast] = useState<ToastMessage>(); const [legacySets, setLegacySets] = useState<StudySet[]>(); const [importing, setImporting] = useState(false);
   const paymentReturnStatus = getPaymentReturnStatus(window.location.pathname);
   const visibleView = activeView;
@@ -124,6 +205,68 @@ function AuthenticatedApp({ user }: { user: NonNullable<ReturnType<typeof useAut
 
     setCreateOpen(true);
   };
+  const openAiCreation = (initialType: AiContentType = 'flashcards') => {
+    setAiInitialType(initialType);
+    setAiOpen(true);
+  };
+  const saveAiFlashcards = async (content: AiFlashcardsContent, generationId: string) => {
+    setAiSaving(true);
+    try {
+      const draft = createAiFlashcardsDraft(content, generationId);
+      if (!draft.cards.length) throw new Error('Adicione pelo menos um flashcard antes de salvar.');
+
+      const created = await addStudySet(draft);
+      setActiveSetId(created.id);
+      setAiOpen(false);
+      notify('success', 'Seu material foi criado com sucesso.');
+      navigate('studies');
+    } catch (reason) {
+      notify('error', reason instanceof Error ? reason.message : 'Não foi possível salvar o material gerado.');
+    } finally {
+      setAiSaving(false);
+    }
+  };
+  const saveAiMindMap = async (content: AiMindMapContent, generationId: string, nodes: MindMapNode[], edges: MindMapEdge[], mode: MindMapMode) => {
+    setAiSaving(true);
+    try {
+      const prepared = prepareAiMindMapForSaving(nodes, edges);
+      if (!prepared.cards.length) throw new Error('O mapa precisa ter pelo menos um conceito para ser salvo.');
+
+      const createdSet = await addStudySet({
+        title: content.title.trim(),
+        subject: content.topic.trim() || 'Mapa mental',
+        description: content.description.trim() || `Mapa mental gerado com IA sobre ${content.topic}.`,
+        color: '#6758e8',
+        icon: 'general',
+        cards: prepared.cards,
+        createdByAi: true,
+        aiTopic: content.topic,
+        aiGenerationId: generationId,
+      });
+
+      await createMentalMap({
+        userId: user.id,
+        studySetId: createdSet.id,
+        title: content.title.trim(),
+        nodes: prepared.nodes,
+        edges,
+        mode,
+        createdByAi: true,
+        aiTopic: content.topic,
+        aiGenerationId: generationId,
+      });
+
+      setActiveSetId(createdSet.id);
+      setMindMapsVersion((current) => current + 1);
+      setAiOpen(false);
+      notify('success', 'Seu material foi criado com sucesso.');
+      navigate('mindmaps');
+    } catch (reason) {
+      notify('error', reason instanceof Error ? reason.message : 'Não foi possível salvar o mapa gerado.');
+    } finally {
+      setAiSaving(false);
+    }
+  };
   const study = (set: StudySet, flashcardId?: string) => {
     if (!billing.isPremium) {
       setActiveSetId(set.id);
@@ -148,9 +291,9 @@ function AuthenticatedApp({ user }: { user: NonNullable<ReturnType<typeof useAut
   const premiumWindow = <SubscriptionPaywall subscription={billing.subscription} isStarting={billing.isStarting} isRefreshing={billing.isRefreshing} errorMessage={billing.errorMessage} onSubscribe={() => void billing.startSubscription()} onRefresh={() => void billing.refresh()} onSignOut={() => void logout()} showSignOut={false}/>;
   const premiumContent = () => {
     if (visibleView === 'home') return <>{starterWarning && <div className="starter-warning" role="status"><AlertTriangle size={17}/><span>{starterWarning}</span></div>}<HomeView studySets={filteredSets} isPremium={billing.isPremium} onStudy={study} onNavigate={navigate} onCreate={openCreate}/></>;
-    if (visibleView === 'studies') return <StudiesView studySets={filteredSets} isPremium={billing.isPremium} onStudy={study} onCreate={openCreate}/>;
+    if (visibleView === 'studies') return <StudiesView studySets={filteredSets} isPremium={billing.isPremium} onStudy={study} onCreate={openCreate} onCreateWithAi={() => openAiCreation('flashcards')}/>;
     if (visibleView === 'flashcards') return <FlashcardsView studySet={activeSet} startCardId={activeCardId} studySets={studySets} isPremium={billing.isPremium} onRequirePremium={requirePremium} onChange={study} onUpdate={updateStudySet} onRate={rateCard} onBack={() => navigate('studies')}/>;
-    if (visibleView === 'mindmaps') return <MindMapsView userId={user.id} studySets={studySets} isPremium={billing.isPremium} onRequirePremium={requirePremium} onCreateSet={openCreate} onStudyFlashcard={study} notify={notify}/>;
+    if (visibleView === 'mindmaps') return <MindMapsView key={mindMapsVersion} userId={user.id} studySets={studySets} isPremium={billing.isPremium} onRequirePremium={requirePremium} onCreateSet={openCreate} onCreateWithAi={() => openAiCreation('mind_map')} onStudyFlashcard={study} notify={notify}/>;
     if (visibleView === 'quiz') return <QuizView studySets={studySets} userId={user.id} isPremium={billing.isPremium} onRequirePremium={requirePremium} onError={(message) => notify('error', message)}/>;
     return <ProgressView studySets={studySets}/>;
   };
@@ -166,5 +309,5 @@ function AuthenticatedApp({ user }: { user: NonNullable<ReturnType<typeof useAut
   if (paymentReturnStatus) return <PaymentStatusScreen status={paymentReturnStatus} isPremium={billing.isPremium} checking={billing.isRefreshing} errorMessage={billing.errorMessage} onCheck={() => void billing.refresh()} onContinue={() => { window.history.replaceState({}, document.title, '/'); setActiveView('home'); }}/>;
   if (shouldShowFirstRunOnboarding) return <OnboardingFlow onComplete={finishTutorial} onBypass={() => setOnboardingBypassed(true)} />;
 
-  return <div className="app-shell"><Sidebar activeView={visibleView} onNavigate={navigate} name={profile.full_name} avatarUrl={profile.avatar_url} isPremium={billing.isPremium}/><main className="main-content"><Header view={visibleView} search={search} onSearch={setSearch} onCreate={openCreate} userName={profile.full_name} showStudyActions={!nonStudyActionViews.has(visibleView)}/>{content()}</main><BottomNavigation activeView={visibleView} onNavigate={navigate} isPremium={billing.isPremium}/><Modal open={premiumOpen} onClose={() => setPremiumOpen(false)} hideHeader className="modal--premium" title="Assine o StudyFlow"><div className="premium-window">{premiumWindow}</div></Modal><Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Crie seu conjunto" description="Os dados serão salvos na sua conta."><CreateStudySetForm onSave={saveSet} onCancel={() => setCreateOpen(false)}/></Modal>{replayTutorial && <OnboardingFlow onComplete={finishTutorial} onBypass={() => setReplayTutorial(false)} />}<Modal open={Boolean(legacySets)} onClose={() => { localStorage.removeItem(LEGACY_KEY); setLegacySets(undefined); }} title="Encontramos estudos neste navegador" description="Você decide se quer levá-los para sua conta."><div className="legacy-import"><p>Os dados antigos não serão enviados sem sua autorização. Conjuntos com o mesmo nome serão ignorados.</p><div><Button variant="ghost" onClick={() => { localStorage.removeItem(LEGACY_KEY); setLegacySets(undefined); }}>Descartar dados locais</Button><Button loading={importing} onClick={() => void importLegacy()}>Importar para minha conta</Button></div></div></Modal>{toast && <Toast toast={toast} onClose={() => setToast(undefined)}/>}</div>;
+  return <div className="app-shell"><Sidebar activeView={visibleView} onNavigate={navigate} name={profile.full_name} avatarUrl={profile.avatar_url} isPremium={billing.isPremium}/><main className="main-content"><Header view={visibleView} search={search} onSearch={setSearch} onCreate={openCreate} userName={profile.full_name} showStudyActions={!nonStudyActionViews.has(visibleView)}/>{content()}</main><BottomNavigation activeView={visibleView} onNavigate={navigate} isPremium={billing.isPremium}/><Modal open={premiumOpen} onClose={() => setPremiumOpen(false)} hideHeader className="modal--premium" title="Assine o StudyFlow"><div className="premium-window">{premiumWindow}</div></Modal><Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Crie seu conjunto" description="Os dados serão salvos na sua conta."><CreateStudySetForm onSave={saveSet} onCancel={() => setCreateOpen(false)}/></Modal><AiCreationModal open={aiOpen} initialType={aiInitialType} saving={aiSaving} onClose={() => setAiOpen(false)} onSaveFlashcards={saveAiFlashcards} onSaveMindMap={saveAiMindMap}/>{replayTutorial && <OnboardingFlow onComplete={finishTutorial} onBypass={() => setReplayTutorial(false)} />}<Modal open={Boolean(legacySets)} onClose={() => { localStorage.removeItem(LEGACY_KEY); setLegacySets(undefined); }} title="Encontramos estudos neste navegador" description="Você decide se quer levá-los para sua conta."><div className="legacy-import"><p>Os dados antigos não serão enviados sem sua autorização. Conjuntos com o mesmo nome serão ignorados.</p><div><Button variant="ghost" onClick={() => { localStorage.removeItem(LEGACY_KEY); setLegacySets(undefined); }}>Descartar dados locais</Button><Button loading={importing} onClick={() => void importLegacy()}>Importar para minha conta</Button></div></div></Modal>{toast && <Toast toast={toast} onClose={() => setToast(undefined)}/>}</div>;
 }

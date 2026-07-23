@@ -1,4 +1,4 @@
-import { Atom, BookOpenText, Calculator, Crown, Languages, MoreHorizontal, Play, ScrollText } from 'lucide-react';
+import { Atom, BookOpenText, Calculator, Crown, Languages, MoreHorizontal, Play, ScrollText, Sparkles } from 'lucide-react';
 import type { StudySet } from '../../types';
 import { getSetProgress } from '../../utils/study';
 import { ProgressBar } from '../ui/ProgressBar';
@@ -14,7 +14,7 @@ export function StudySetCard({ studySet, onStudy, isPremium = true }: { studySet
         <span className="set-card__icon"><Icon size={23} /></span>
         <button className="icon-button icon-button--small" aria-label={`Opções de ${studySet.title}`}><MoreHorizontal size={19} /></button>
       </div>
-      <div className="set-card__content"><span>{studySet.subject}</span><h3>{studySet.title}</h3><p>{studySet.cards.length} termos</p></div>
+      <div className="set-card__content"><span>{studySet.subject}</span><h3>{studySet.title}</h3><p>{studySet.cards.length} termos</p>{studySet.createdByAi && <small className="set-card__ai"><Sparkles size={12}/> Gerado com IA</small>}</div>
       <ProgressBar value={progress} color={studySet.color} />
       <div className="set-card__footer"><span>{progress}% concluído</span><button className={!isPremium ? 'premium-action-inline' : undefined} onClick={() => onStudy(studySet)}>{isPremium ? 'Estudar' : 'Premium'} {isPremium ? <Play size={15} fill="currentColor" /> : <Crown size={14} />}</button></div>
     </article>

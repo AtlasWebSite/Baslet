@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { sql } from '@vercel/postgres';
 import { ensureSchema } from './db.js';
+import { linkAiGenerationToContent } from './aiUsage.js';
 import type { AppSubscriptionStatus, MercadoPagoPreapproval } from './mercadoPago.js';
 import {
   getMercadoPagoAmount,
@@ -32,6 +33,12 @@ function toMastery(status?: string | null): Mastery {
 
 function normalizeText(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+function normalizeRecordId(value: unknown) {
+  const normalized = normalizeText(value);
+  if (!/^[a-zA-Z0-9_-]{3,120}$/.test(normalized)) return '';
+  return normalized;
 }
 
 function mapProfile(row: Record<string, unknown>) {
@@ -158,6 +165,8 @@ export async function getStudySets(user: SessionUser) {
     color: String(studySet.color),
     icon: toIcon(studySet.icon),
     updatedAt: new Date(String(studySet.updated_at)).toISOString(),
+    createdByAi: Boolean(studySet.created_by_ai),
+    aiTopic: typeof studySet.ai_topic === 'string' ? studySet.ai_topic : undefined,
     cards: (cardsBySet.get(String(studySet.id)) ?? []).map((card) => ({
       id: String(card.id),
       term: String(card.term),
@@ -187,21 +196,25 @@ export async function createStudySetForUser(user: SessionUser, draft: Record<str
   const description = normalizeText(draft.description) || null;
   const color = normalizeText(draft.color) || '#6758e8';
   const icon = toIcon(draft.icon);
+  const createdByAi = draft.createdByAi === true;
+  const aiTopic = normalizeText(draft.aiTopic) || null;
 
   const createdSet = await sql`
-    insert into study_sets (id, user_id, title, description, subject, color, icon, created_at, updated_at)
-    values (${studySetId}, ${user.id}, ${title}, ${description}, ${subject}, ${color}, ${icon}, ${now}, ${now})
+    insert into study_sets (id, user_id, title, description, subject, color, icon, created_by_ai, ai_topic, created_at, updated_at)
+    values (${studySetId}, ${user.id}, ${title}, ${description}, ${subject}, ${color}, ${icon}, ${createdByAi}, ${aiTopic}, ${now}, ${now})
     returning *
   `;
 
   for (const card of cards) {
     const record = card as Record<string, unknown>;
+    const cardId = normalizeRecordId(record.id) || randomUUID();
     await sql`
       insert into flashcards (id, user_id, study_set_id, term, definition)
-      values (${randomUUID()}, ${user.id}, ${studySetId}, ${normalizeText(record.term)}, ${normalizeText(record.definition)})
+      values (${cardId}, ${user.id}, ${studySetId}, ${normalizeText(record.term)}, ${normalizeText(record.definition)})
     `;
   }
 
+  await linkAiGenerationToContent(user, normalizeText(draft.aiGenerationId), studySetId);
   const studySets = await getStudySets(user);
   return studySets.find((studySet) => studySet.id === String(createdSet.rows[0].id));
 }
@@ -279,6 +292,8 @@ function mapMentalMap(row: Record<string, unknown>) {
     mode: row.mode === 'complete' ? 'complete' : 'summary',
     createdAt: new Date(String(row.created_at)).toISOString(),
     updatedAt: new Date(String(row.updated_at)).toISOString(),
+    createdByAi: Boolean(row.created_by_ai),
+    aiTopic: typeof row.ai_topic === 'string' ? row.ai_topic : undefined,
   };
 }
 
@@ -304,14 +319,17 @@ export async function createMentalMapForUser(user: SessionUser, payload: Record<
   const nodes = JSON.stringify(Array.isArray(payload.nodes) ? payload.nodes : []);
   const edges = JSON.stringify(Array.isArray(payload.edges) ? payload.edges : []);
   const mode = payload.mode === 'complete' ? 'complete' : 'summary';
+  const createdByAi = payload.createdByAi === true;
+  const aiTopic = normalizeText(payload.aiTopic) || null;
   const id = randomUUID();
 
   const { rows } = await sql`
-    insert into mental_maps (id, user_id, study_set_id, title, nodes, edges, mode)
-    values (${id}, ${user.id}, ${studySetId}, ${title}, ${nodes}::jsonb, ${edges}::jsonb, ${mode})
+    insert into mental_maps (id, user_id, study_set_id, title, nodes, edges, mode, created_by_ai, ai_topic)
+    values (${id}, ${user.id}, ${studySetId}, ${title}, ${nodes}::jsonb, ${edges}::jsonb, ${mode}, ${createdByAi}, ${aiTopic})
     returning *
   `;
 
+  await linkAiGenerationToContent(user, normalizeText(payload.aiGenerationId), id);
   return mapMentalMap(rows[0]);
 }
 

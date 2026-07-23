@@ -29,6 +29,9 @@ export interface MentalMap {
   mode: MindMapMode;
   createdAt: string;
   updatedAt: string;
+  createdByAi?: boolean;
+  aiTopic?: string;
+  aiGenerationId?: string;
 }
 
 export interface MentalMapDraft {
@@ -38,4 +41,7 @@ export interface MentalMapDraft {
   nodes: MindMapNode[];
   edges: MindMapEdge[];
   mode: MindMapMode;
+  createdByAi?: boolean;
+  aiTopic?: string;
+  aiGenerationId?: string;
 }

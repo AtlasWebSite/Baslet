@@ -8,6 +8,7 @@
     "dev:vite": "vite",
     "build": "tsc -b && tsc --noEmit -p tsconfig.api.json && vite build",
     "lint": "eslint .",
+    "test": "node --test --import tsx \"tests/**/*.test.ts\"",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -15,10 +16,12 @@
     "@vitejs/plugin-react": "latest",
     "jose": "^6.2.4",
     "lucide-react": "latest",
+    "openai": "^6.49.0",
     "react": "latest",
     "react-dom": "latest",
     "typescript": "latest",
-    "vite": "latest"
+    "vite": "latest",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@eslint/js": "latest",
@@ -29,6 +32,7 @@
     "eslint-plugin-react-hooks": "latest",
     "eslint-plugin-react-refresh": "latest",
     "globals": "latest",
+    "tsx": "^4.23.1",
     "typescript-eslint": "latest",
     "vercel": "^56.4.1"
   }

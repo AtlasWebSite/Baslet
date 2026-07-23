@@ -118,11 +118,48 @@ async function createSchema() {
   await sql`alter table subscriptions add column if not exists mercado_pago_preapproval_id text`;
   await sql`alter table subscriptions add column if not exists mercado_pago_payer_id text`;
   await sql`alter table subscriptions add column if not exists mercado_pago_checkout_url text`;
+  await sql`alter table study_sets add column if not exists created_by_ai boolean not null default false`;
+  await sql`alter table study_sets add column if not exists ai_topic text`;
+  await sql`alter table mental_maps add column if not exists created_by_ai boolean not null default false`;
+  await sql`alter table mental_maps add column if not exists ai_topic text`;
+
+  await sql`
+    create table if not exists ai_generations (
+      id text primary key,
+      user_id text not null references profiles(id) on delete cascade,
+      content_type text not null,
+      topic text not null,
+      model text not null,
+      prompt_tokens integer not null default 0,
+      completion_tokens integer not null default 0,
+      total_tokens integer not null default 0,
+      status text not null,
+      created_content_id text,
+      created_at timestamptz not null default now()
+    )
+  `;
+
+  await sql`
+    create table if not exists ai_rate_events (
+      id text primary key,
+      user_id text not null references profiles(id) on delete cascade,
+      created_at timestamptz not null default now()
+    )
+  `;
+
+  await sql`
+    create table if not exists ai_generation_locks (
+      user_id text primary key references profiles(id) on delete cascade,
+      locked_at timestamptz not null default now()
+    )
+  `;
 
   await sql`create index if not exists study_sets_user_idx on study_sets(user_id)`;
   await sql`create index if not exists flashcards_user_set_idx on flashcards(user_id, study_set_id)`;
   await sql`create index if not exists mental_maps_user_idx on mental_maps(user_id)`;
   await sql`create index if not exists subscriptions_preapproval_idx on subscriptions(mercado_pago_preapproval_id)`;
+  await sql`create index if not exists ai_generations_user_month_idx on ai_generations(user_id, created_at)`;
+  await sql`create index if not exists ai_rate_events_user_created_idx on ai_rate_events(user_id, created_at)`;
 }
 
 export async function upsertProfileFromSession(user: SessionUser) {
