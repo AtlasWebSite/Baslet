@@ -358,7 +358,7 @@ async function handleSubscriptionCancel(request: VercelRequest, response: Vercel
   try {
     const user = await requireSessionUser(request);
     await cancelUserSubscription(user);
-    json(response, 200, { status: 'cancelled' });
+    json(response, 200, { status: 'active' });
   } catch {
     unauthorized(response, 'Entre novamente para cancelar a assinatura.');
   }

@@ -1,11 +1,11 @@
-import { Atom, BookOpenText, Calculator, Languages, MoreHorizontal, Play, ScrollText } from 'lucide-react';
+import { Atom, BookOpenText, Calculator, Crown, Languages, MoreHorizontal, Play, ScrollText } from 'lucide-react';
 import type { StudySet } from '../../types';
 import { getSetProgress } from '../../utils/study';
 import { ProgressBar } from '../ui/ProgressBar';
 
 const icons = { language: Languages, biology: Atom, history: ScrollText, math: Calculator, general: BookOpenText };
 
-export function StudySetCard({ studySet, onStudy }: { studySet: StudySet; onStudy: (studySet: StudySet) => void }) {
+export function StudySetCard({ studySet, onStudy, isPremium = true }: { studySet: StudySet; onStudy: (studySet: StudySet) => void; isPremium?: boolean }) {
   const Icon = icons[studySet.icon];
   const progress = getSetProgress(studySet);
   return (
@@ -16,7 +16,7 @@ export function StudySetCard({ studySet, onStudy }: { studySet: StudySet; onStud
       </div>
       <div className="set-card__content"><span>{studySet.subject}</span><h3>{studySet.title}</h3><p>{studySet.cards.length} termos</p></div>
       <ProgressBar value={progress} color={studySet.color} />
-      <div className="set-card__footer"><span>{progress}% concluído</span><button onClick={() => onStudy(studySet)}>Estudar <Play size={15} fill="currentColor" /></button></div>
+      <div className="set-card__footer"><span>{progress}% concluído</span><button className={!isPremium ? 'premium-action-inline' : undefined} onClick={() => onStudy(studySet)}>{isPremium ? 'Estudar' : 'Premium'} {isPremium ? <Play size={15} fill="currentColor" /> : <Crown size={14} />}</button></div>
     </article>
   );
 }

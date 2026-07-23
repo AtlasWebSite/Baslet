@@ -5,11 +5,12 @@ interface ModalProps {
   open: boolean;
   title: string;
   description?: string;
+  eyebrow?: string;
   onClose: () => void;
   children: ReactNode;
 }
 
-export function Modal({ open, title, description, onClose, children }: ModalProps) {
+export function Modal({ open, title, description, eyebrow = 'Novo material', onClose, children }: ModalProps) {
   useEffect(() => {
     if (!open) return;
     const closeOnEscape = (event: KeyboardEvent) => event.key === 'Escape' && onClose();
@@ -22,7 +23,7 @@ export function Modal({ open, title, description, onClose, children }: ModalProp
     <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <section className="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
         <header className="modal__header">
-          <div><span className="eyebrow">Novo material</span><h2 id="modal-title">{title}</h2>{description && <p>{description}</p>}</div>
+          <div><span className="eyebrow">{eyebrow}</span><h2 id="modal-title">{title}</h2>{description && <p>{description}</p>}</div>
           <button className="icon-button" onClick={onClose} aria-label="Fechar"><X size={20} /></button>
         </header>
         {children}

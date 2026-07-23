@@ -5,7 +5,7 @@ import { StudySetCard } from '../components/cards/StudySetCard';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import { Button } from '../components/ui/Button';
 
-export function HomeView({ studySets, onStudy, onNavigate, onCreate }: { studySets: StudySet[]; onStudy: (studySet: StudySet) => void; onNavigate: (view: ViewId) => void; onCreate: () => void }) {
+export function HomeView({ studySets, isPremium, onStudy, onNavigate, onCreate }: { studySets: StudySet[]; isPremium: boolean; onStudy: (studySet: StudySet) => void; onNavigate: (view: ViewId) => void; onCreate: () => void }) {
   const progress = getOverallProgress(studySets);
   const cards = studySets.flatMap((studySet) => studySet.cards);
   const reviewCount = cards.filter((flashcard) => flashcard.mastery < 2).length;
@@ -26,7 +26,7 @@ export function HomeView({ studySets, onStudy, onNavigate, onCreate }: { studySe
 
       <div className="dashboard-grid">
         <section className="content-section recent-section"><div className="section-heading"><div><span className="eyebrow">Continue aprendendo</span><h2>Estudos recentes</h2></div><button onClick={() => onNavigate('studies')}>Ver todos <ArrowRight size={16} /></button></div>
-          {studySets.length ? <div className="set-grid">{studySets.slice(0, 3).map((studySet) => <StudySetCard key={studySet.id} studySet={studySet} onStudy={onStudy} />)}</div> : <div className="mini-empty"><BookOpen size={25} /><span>Nenhum conjunto ainda.</span><button onClick={onCreate}>Criar agora</button></div>}
+          {studySets.length ? <div className="set-grid">{studySets.slice(0, 3).map((studySet) => <StudySetCard key={studySet.id} studySet={studySet} isPremium={isPremium} onStudy={onStudy} />)}</div> : <div className="mini-empty"><BookOpen size={25} /><span>Nenhum conjunto ainda.</span><button onClick={onCreate}>Criar agora</button></div>}
         </section>
         <aside className="daily-card"><div className="daily-card__top"><span><BrainCircuit size={22} /></span><div><small>SEU ACERVO</small><strong>{cards.length} flashcards</strong></div></div><p>{reviewCount ? `${reviewCount} cards ainda precisam de mais prática.` : 'Você dominou todos os cards deste acervo.'}</p><ProgressBar value={progress} color="#6758e8" /><div className="daily-card__footer"><span>Progresso real sincronizado</span><strong>{progress}%</strong></div></aside>
       </div>

@@ -39,12 +39,18 @@ function mapProfile(row: Record<string, unknown>) {
 }
 
 function mapSubscription(row: Record<string, unknown>) {
+  const rawStatus = String(row.status);
+  const nextPaymentAt = row.next_payment_at ? new Date(String(row.next_payment_at)) : null;
+  const shouldStayActive = Boolean(row.cancelled_at && nextPaymentAt && nextPaymentAt > new Date());
+  const paidPeriodEnded = Boolean(row.cancelled_at && nextPaymentAt && nextPaymentAt <= new Date());
+  const status = paidPeriodEnded ? 'cancelled' : rawStatus === 'cancelled' && shouldStayActive ? 'active' : rawStatus;
+
   return {
     id: String(row.id),
     userId: String(row.user_id),
     mercadoPagoPreapprovalId: null,
     mercadoPagoPayerId: null,
-    status: String(row.status),
+    status,
     planName: String(row.plan_name ?? 'StudyFlow Premium'),
     amount: Number(row.amount ?? 11.9),
     currency: String(row.currency ?? 'BRL'),
@@ -303,7 +309,13 @@ export async function cancelUserSubscription(user: SessionUser) {
 
   await sql`
     update subscriptions
-    set status = 'cancelled', cancelled_at = now(), updated_at = now()
+    set status = case
+          when coalesce(next_payment_at, now() + interval '1 month') > now() then 'active'
+          else 'cancelled'
+        end,
+        next_payment_at = coalesce(next_payment_at, now() + interval '1 month'),
+        cancelled_at = now(),
+        updated_at = now()
     where user_id = ${user.id}
   `;
 }
