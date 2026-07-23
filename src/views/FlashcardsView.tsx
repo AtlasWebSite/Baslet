@@ -13,7 +13,7 @@ export function FlashcardsView({ studySet, startCardId, studySets, isPremium, on
     const requestedIndex = studySet?.cards.findIndex((card) => card.id === startCardId) ?? -1;
     setIndex(requestedIndex >= 0 ? requestedIndex : 0);
     setFlipped(false);
-  }, [studySet?.id, startCardId]);
+  }, [studySet?.id, studySet?.cards, startCardId]);
   if (!studySet || !studySet.cards.length) return <div className="view"><EmptyState icon={<HelpCircle size={32} />} title="Nenhum flashcard disponível" description="Escolha um conjunto com termos para começar a estudar." action={<Button onClick={onBack}>Ver meus estudos</Button>} /></div>;
   if (!isPremium) {
     return (

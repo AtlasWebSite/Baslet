@@ -8,7 +8,7 @@ import { Toast } from './components/ui/Toast';
 import { LoadingState } from './components/ui/LoadingState';
 import { AuthGuard } from './components/auth/AuthGuard';
 import { AuthCallbackPage } from './components/auth/AuthCallbackPage';
-import { OnboardingTutorial } from './components/onboarding/OnboardingTutorial';
+import { OnboardingFlow } from './components/onboarding/OnboardingFlow';
 import { CreateStudySetForm } from './components/forms/CreateStudySetForm';
 import { SubscriptionPaywall } from './components/billing/SubscriptionPaywall';
 import { SubscriptionStatusCard } from './components/billing/SubscriptionStatusCard';
@@ -52,7 +52,7 @@ function AuthenticatedApp({ user }: { user: NonNullable<ReturnType<typeof useAut
   const { profile, isLoading: profileLoading, error: profileError, finishOnboarding } = useProfile(user);
   const { studySets, isLoading: setsLoading, error: setsError, starterSetsCreated, starterWarning, addStudySet, updateStudySet, clearStudySets, clearSensitiveState } = useStudySets(user.id, true);
   const [activeView, setActiveView] = useState<ViewId>('home'); const [activeSetId, setActiveSetId] = useState<string>(); const [activeCardId, setActiveCardId] = useState<string>();
-  const [search, setSearch] = useState(''); const [createOpen, setCreateOpen] = useState(false); const [premiumOpen, setPremiumOpen] = useState(false); const [replayTutorial, setReplayTutorial] = useState(false);
+  const [search, setSearch] = useState(''); const [createOpen, setCreateOpen] = useState(false); const [premiumOpen, setPremiumOpen] = useState(false); const [replayTutorial, setReplayTutorial] = useState(false); const [onboardingBypassed, setOnboardingBypassed] = useState(false);
   const [toast, setToast] = useState<ToastMessage>(); const [legacySets, setLegacySets] = useState<StudySet[]>(); const [importing, setImporting] = useState(false);
   const paymentReturnStatus = getPaymentReturnStatus(window.location.pathname);
   const visibleView = activeView;
@@ -66,6 +66,7 @@ function AuthenticatedApp({ user }: { user: NonNullable<ReturnType<typeof useAut
 
   if (profileLoading || billing.isLoading || setsLoading) return <LoadingState label={billing.isLoading ? 'Verificando assinatura...' : 'Sincronizando seus estudos...'}/>;
   if (profileError || !profile || setsError) return <div className="auth-error-screen"><h1>Não foi possível carregar sua conta</h1><p>{profileError ?? setsError ?? 'Perfil indisponível.'}</p><button onClick={() => window.location.reload()}>Tentar novamente</button></div>;
+  const shouldShowFirstRunOnboarding = !profile.onboarding_completed && starterSetsCreated && !onboardingBypassed;
 
   const notify = (type: ToastMessage['type'], message: string) => setToast({ id: newId('toast'), type, message });
   const navigate = (view: ViewId) => { setActiveView(view); window.scrollTo({ top: 0, behavior: 'smooth' }); };
@@ -121,6 +122,7 @@ function AuthenticatedApp({ user }: { user: NonNullable<ReturnType<typeof useAut
   };
 
   if (paymentReturnStatus) return <PaymentStatusScreen status={paymentReturnStatus} isPremium={billing.isPremium} checking={billing.isRefreshing} errorMessage={billing.errorMessage} onCheck={() => void billing.refresh()} onContinue={() => { window.history.replaceState({}, document.title, '/'); setActiveView('home'); }}/>;
+  if (shouldShowFirstRunOnboarding) return <OnboardingFlow onComplete={finishTutorial} onBypass={() => setOnboardingBypassed(true)} />;
 
-  return <div className="app-shell"><Sidebar activeView={visibleView} onNavigate={navigate} name={profile.full_name} avatarUrl={profile.avatar_url} isPremium={billing.isPremium}/><main className="main-content"><Header view={visibleView} search={search} onSearch={setSearch} onCreate={openCreate} userName={profile.full_name} showStudyActions={!nonStudyActionViews.has(visibleView)}/>{content()}</main><BottomNavigation activeView={visibleView} onNavigate={navigate} isPremium={billing.isPremium}/><Modal open={premiumOpen} onClose={() => setPremiumOpen(false)} hideHeader className="modal--premium" title="Assine o StudyFlow"><div className="premium-window">{premiumWindow}</div></Modal><Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Crie seu conjunto" description="Os dados serão salvos na sua conta."><CreateStudySetForm onSave={saveSet} onCancel={() => setCreateOpen(false)}/></Modal>{(!profile.onboarding_completed || replayTutorial) && <OnboardingTutorial onComplete={finishTutorial}/>}<Modal open={Boolean(legacySets)} onClose={() => { localStorage.removeItem(LEGACY_KEY); setLegacySets(undefined); }} title="Encontramos estudos neste navegador" description="Você decide se quer levá-los para sua conta."><div className="legacy-import"><p>Os dados antigos não serão enviados sem sua autorização. Conjuntos com o mesmo nome serão ignorados.</p><div><Button variant="ghost" onClick={() => { localStorage.removeItem(LEGACY_KEY); setLegacySets(undefined); }}>Descartar dados locais</Button><Button loading={importing} onClick={() => void importLegacy()}>Importar para minha conta</Button></div></div></Modal>{toast && <Toast toast={toast} onClose={() => setToast(undefined)}/>}</div>;
+  return <div className="app-shell"><Sidebar activeView={visibleView} onNavigate={navigate} name={profile.full_name} avatarUrl={profile.avatar_url} isPremium={billing.isPremium}/><main className="main-content"><Header view={visibleView} search={search} onSearch={setSearch} onCreate={openCreate} userName={profile.full_name} showStudyActions={!nonStudyActionViews.has(visibleView)}/>{content()}</main><BottomNavigation activeView={visibleView} onNavigate={navigate} isPremium={billing.isPremium}/><Modal open={premiumOpen} onClose={() => setPremiumOpen(false)} hideHeader className="modal--premium" title="Assine o StudyFlow"><div className="premium-window">{premiumWindow}</div></Modal><Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Crie seu conjunto" description="Os dados serão salvos na sua conta."><CreateStudySetForm onSave={saveSet} onCancel={() => setCreateOpen(false)}/></Modal>{replayTutorial && <OnboardingFlow onComplete={finishTutorial} onBypass={() => setReplayTutorial(false)} />}<Modal open={Boolean(legacySets)} onClose={() => { localStorage.removeItem(LEGACY_KEY); setLegacySets(undefined); }} title="Encontramos estudos neste navegador" description="Você decide se quer levá-los para sua conta."><div className="legacy-import"><p>Os dados antigos não serão enviados sem sua autorização. Conjuntos com o mesmo nome serão ignorados.</p><div><Button variant="ghost" onClick={() => { localStorage.removeItem(LEGACY_KEY); setLegacySets(undefined); }}>Descartar dados locais</Button><Button loading={importing} onClick={() => void importLegacy()}>Importar para minha conta</Button></div></div></Modal>{toast && <Toast toast={toast} onClose={() => setToast(undefined)}/>}</div>;
 }

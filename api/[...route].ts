@@ -437,7 +437,7 @@ async function handleMentalMapById(request: VercelRequest, response: VercelRespo
 }
 
 export default async function handler(request: VercelRequest, response: VercelResponse) {
-  const [resource, action, id] = getRouteSegments(request);
+  const [resource, action] = getRouteSegments(request);
 
   if (resource === 'auth' && action === 'google') return handleGoogleLogin(request, response);
   if (resource === 'auth' && action === 'callback') return handleGoogleCallback(request, response);
