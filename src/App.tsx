@@ -32,6 +32,7 @@ import { ProfileView } from './views/ProfileView';
 import { MindMapsView } from './views/MindMapsView';
 
 const LEGACY_KEY = 'studyflow_sets_v1';
+const INITIAL_VIEW: ViewId = 'home';
 const nonStudyActionViews = new Set<ViewId>(['billing', 'profile']);
 
 function getPaymentReturnStatus(pathname: string): PaymentReturnStatus | undefined {
@@ -51,7 +52,7 @@ function AuthenticatedApp({ user }: { user: NonNullable<ReturnType<typeof useAut
   const billing = useSubscription(user.id);
   const { profile, isLoading: profileLoading, error: profileError, finishOnboarding } = useProfile(user);
   const { studySets, isLoading: setsLoading, error: setsError, starterSetsCreated, starterWarning, addStudySet, updateStudySet, clearStudySets, clearSensitiveState } = useStudySets(user.id, true);
-  const [activeView, setActiveView] = useState<ViewId>('home'); const [activeSetId, setActiveSetId] = useState<string>(); const [activeCardId, setActiveCardId] = useState<string>();
+  const [activeView, setActiveView] = useState<ViewId>(INITIAL_VIEW); const [activeSetId, setActiveSetId] = useState<string>(); const [activeCardId, setActiveCardId] = useState<string>();
   const [search, setSearch] = useState(''); const [createOpen, setCreateOpen] = useState(false); const [premiumOpen, setPremiumOpen] = useState(false); const [replayTutorial, setReplayTutorial] = useState(false); const [onboardingBypassed, setOnboardingBypassed] = useState(false);
   const [toast, setToast] = useState<ToastMessage>(); const [legacySets, setLegacySets] = useState<StudySet[]>(); const [importing, setImporting] = useState(false);
   const paymentReturnStatus = getPaymentReturnStatus(window.location.pathname);
@@ -60,6 +61,15 @@ function AuthenticatedApp({ user }: { user: NonNullable<ReturnType<typeof useAut
   const filteredSets = useMemo(() => studySets.filter((set) => `${set.title} ${set.subject}`.toLocaleLowerCase().includes(search.toLocaleLowerCase())), [studySets, search]);
 
   useEffect(() => { if (!toast) return; const timer = window.setTimeout(() => setToast(undefined), 3500); return () => window.clearTimeout(timer); }, [toast]);
+  useEffect(() => {
+    setActiveView(INITIAL_VIEW);
+    setActiveCardId(undefined);
+
+    if (getPaymentReturnStatus(window.location.pathname)) return;
+    if (window.location.pathname === '/') return;
+
+    window.history.replaceState({}, document.title, '/');
+  }, [user.id]);
   useEffect(() => { if (!starterSetsCreated) return; setToast({ id: newId('toast'), type: 'success', message: 'Criamos alguns flashcards iniciais para você começar.' }); }, [starterSetsCreated]);
   useEffect(() => { try { const raw = localStorage.getItem(LEGACY_KEY); if (!raw) return; const parsed: unknown = JSON.parse(raw); if (Array.isArray(parsed) && parsed.length) setLegacySets(parsed as StudySet[]); } catch { localStorage.removeItem(LEGACY_KEY); } }, []);
   useEffect(() => { if (billing.isPremium) setPremiumOpen(false); }, [billing.isPremium]);
@@ -98,7 +108,7 @@ function AuthenticatedApp({ user }: { user: NonNullable<ReturnType<typeof useAut
   const rateCard = async (set: StudySet, cardId: string, mastery: 1|2|3) => { if (!billing.isPremium) { requirePremium('Assine para salvar seu progresso nos flashcards.'); throw new Error('Premium necessário.'); } await saveCardProgress(user.id, set, cardId, mastery); notify('success', 'Progresso sincronizado.'); };
   const clear = async () => { if (!billing.isPremium) { requirePremium('Assine para gerenciar seus dados de estudo.'); return; } if (!window.confirm('Excluir todos os seus conjuntos, flashcards e progresso? Esta ação não pode ser desfeita.')) return; await clearStudySets(); notify('info', 'Seus dados de estudo foram removidos.'); };
   const logout = async () => { clearSensitiveState(); await signOut(); };
-  const finishTutorial = async () => { if (!profile.onboarding_completed) await finishOnboarding(); setReplayTutorial(false); };
+  const finishTutorial = async () => { if (!profile.onboarding_completed) await finishOnboarding(); setActiveView(INITIAL_VIEW); setReplayTutorial(false); };
   const cancelPlan = async () => { if (!window.confirm('Cancelar a renovação do StudyFlow Premium? Você continua com acesso até o fim do período pago.')) return; await billing.cancel(); notify('info', 'Renovação cancelada. Seu acesso continua até o fim do período pago.'); };
   const importLegacy = async () => { if (!legacySets) return; if (!billing.isPremium) { requirePremium('Assine para importar estudos antigos para sua conta.'); return; } setImporting(true); try { const existingTitles = new Set(studySets.map((set) => set.title.trim().toLowerCase())); const unique = legacySets.filter((set) => !existingTitles.has(set.title.trim().toLowerCase())); for (const set of unique) await addStudySet({ title: set.title, subject: set.subject, description: set.description, color: set.color || '#6758e8', icon: set.icon || 'general', cards: set.cards.map((card) => ({ ...card, mastery: 0 })) }); localStorage.removeItem(LEGACY_KEY); setLegacySets(undefined); notify('success', `${unique.length} conjunto(s) importado(s).`); } catch (reason) { notify('error', reason instanceof Error ? reason.message : 'Falha ao importar.'); } finally { setImporting(false); } };
 
