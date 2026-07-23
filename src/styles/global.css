@@ -273,3 +273,27 @@ h1,h2,h3,p { margin-top: 0; }
   .pricing-card__price strong{font-size:30px}
   .billing-signout{min-height:44px}
 }
+
+/* No mobile, o painel de detalhes do mapa é fixo. Mantemos ele acima da
+   navegação inferior para os botões não ficarem escondidos/sobrepostos. */
+@media (max-width:720px){
+  .mind-details{
+    bottom:calc(88px + env(safe-area-inset-bottom))!important;
+    z-index:29;
+    max-height:calc(100svh - 176px - env(safe-area-inset-bottom))!important;
+    padding-bottom:18px!important;
+  }
+}
+
+@media (max-width:560px){
+  .mind-details{
+    bottom:calc(86px + env(safe-area-inset-bottom))!important;
+    max-height:calc(100svh - 168px - env(safe-area-inset-bottom))!important;
+    border-radius:20px 20px 0 0;
+  }
+
+  .mind-details .button{
+    width:100%;
+    min-height:46px;
+  }
+}
