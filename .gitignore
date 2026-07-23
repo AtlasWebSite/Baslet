@@ -1,6 +1,7 @@
 node_modules
 dist
 LandingPage/
+Baslet Antes da Kime/
 .env
 .env.local
 .env.*.local

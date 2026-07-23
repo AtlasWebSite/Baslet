@@ -17,12 +17,11 @@ interface MindMapsViewProps {
   isPremium: boolean;
   onRequirePremium: (message?: string) => void;
   onCreateSet: () => void;
-  onCreateWithAi: () => void;
   onStudyFlashcard: (studySet: StudySet, flashcardId: string) => void;
   notify: (type: ToastMessage['type'], message: string) => void;
 }
 
-export function MindMapsView({ userId, studySets, isPremium, onRequirePremium, onCreateSet, onCreateWithAi, onStudyFlashcard, notify }: MindMapsViewProps) {
+export function MindMapsView({ userId, studySets, isPremium, onRequirePremium, onCreateSet, onStudyFlashcard, notify }: MindMapsViewProps) {
   const { maps, isLoading, error, saveMap, saveChanges, removeMap } = useMentalMaps(userId);
   const [selectedSetId, setSelectedSetId] = useState('');
   const [nodes, setNodes] = useState<MindMapNode[]>([]);
@@ -38,7 +37,7 @@ export function MindMapsView({ userId, studySets, isPremium, onRequirePremium, o
   const selectedNode = useMemo(() => nodes.find((node) => node.id === selectedNodeId), [nodes, selectedNodeId]);
 
   if (!studySets.length) {
-    return <div className="view"><EmptyState icon={<BrainCircuit size={32}/>} title="Nenhum flashcard disponível" description="Crie um conjunto manualmente ou gere um mapa mental com IA usando apenas um tema." action={<div className="empty-actions"><Button onClick={onCreateSet}>Criar conjunto</Button><Button variant="secondary" icon={<Sparkles size={17}/>} onClick={onCreateWithAi}>Criar com IA</Button></div>}/></div>;
+    return <div className="view"><EmptyState icon={<BrainCircuit size={32}/>} title="Nenhum flashcard disponível" description="Crie um conjunto de flashcards antes de gerar um mapa mental." action={<Button onClick={onCreateSet}>Criar conjunto</Button>}/></div>;
   }
 
   const applyGeneratedMap = (studySet: StudySet) => {
@@ -196,5 +195,5 @@ export function MindMapsView({ userId, studySets, isPremium, onRequirePremium, o
     onStudyFlashcard(selectedSet, selectedNode.flashcardId);
   };
 
-  return <div className="view mind-maps-view"><div className="mind-view-actions"><p>Transforme seus cards em categorias, conceitos e conexões para revisar melhor.</p><div><Button variant="secondary" icon={<Sparkles size={17}/>} onClick={onCreateWithAi}>Criar com IA</Button><Button variant="secondary" icon={<Plus size={17}/>} onClick={newMap}>Novo mapa mental</Button></div></div><MindMapSetSelector studySets={studySets} selectedId={selectedSetId} generating={generating} isPremium={isPremium} onSelect={setSelectedSetId} onGenerate={generate}/>{error && <div className="mind-error" role="alert">{error}</div>}{isLoading && <div className="mind-loading"><span className="spin"><Sparkles size={20}/></span> Carregando mapas salvos...</div>}{nodes.length ? <div className={`mind-workspace ${selectedNode ? 'with-details' : ''}`}><MindMapCanvas nodes={nodes} edges={edges} mode={mode} expandedTermIds={expandedTermIds} selectedNode={selectedNode} saving={saving} saved={Boolean(activeMap)} isPremium={isPremium} onNodesChange={setNodes} onModeChange={changeMode} onToggleTerm={toggleTerm} onExpandAll={expandAll} onCollapseAll={collapseAll} onSelectNode={(node) => setSelectedNodeId(node?.id)} onRegenerate={regenerate} onSave={() => void save()}/>{selectedNode && <MindMapDetailsPanel node={selectedNode} studySetTitle={selectedSet?.title ?? title} onChange={updateNode} onStudy={selectedNode.flashcardId ? studySelectedFlashcard : undefined} onClose={() => setSelectedNodeId(undefined)}/>}</div> : <section className="mind-first-state"><span><Network size={31}/></span><h2>Crie seu primeiro mapa mental</h2><p>Escolha um conjunto de flashcards ou digite um tema para a IA organizar o conteúdo.</p><Button variant="secondary" icon={<Sparkles size={17}/>} onClick={onCreateWithAi}>Criar com IA</Button></section>}<SavedMindMapsList maps={maps} activeId={activeMap?.id} onOpen={openMap} onDelete={(map) => void remove(map)}/></div>;
+  return <div className="view mind-maps-view"><div className="mind-view-actions"><p>Transforme seus cards em categorias, conceitos e conexões para revisar melhor.</p><Button variant="secondary" icon={<Plus size={17}/>} onClick={newMap}>Novo mapa mental</Button></div><MindMapSetSelector studySets={studySets} selectedId={selectedSetId} generating={generating} isPremium={isPremium} onSelect={setSelectedSetId} onGenerate={generate}/>{error && <div className="mind-error" role="alert">{error}</div>}{isLoading && <div className="mind-loading"><span className="spin"><Sparkles size={20}/></span> Carregando mapas salvos...</div>}{nodes.length ? <div className={`mind-workspace ${selectedNode ? 'with-details' : ''}`}><MindMapCanvas nodes={nodes} edges={edges} mode={mode} expandedTermIds={expandedTermIds} selectedNode={selectedNode} saving={saving} saved={Boolean(activeMap)} isPremium={isPremium} onNodesChange={setNodes} onModeChange={changeMode} onToggleTerm={toggleTerm} onExpandAll={expandAll} onCollapseAll={collapseAll} onSelectNode={(node) => setSelectedNodeId(node?.id)} onRegenerate={regenerate} onSave={() => void save()}/>{selectedNode && <MindMapDetailsPanel node={selectedNode} studySetTitle={selectedSet?.title ?? title} onChange={updateNode} onStudy={selectedNode.flashcardId ? studySelectedFlashcard : undefined} onClose={() => setSelectedNodeId(undefined)}/>}</div> : <section className="mind-first-state"><span><Network size={31}/></span><h2>Crie seu primeiro mapa mental</h2><p>Escolha um conjunto de flashcards e transforme seus estudos em um mapa visual.</p></section>}<SavedMindMapsList maps={maps} activeId={activeMap?.id} onOpen={openMap} onDelete={(map) => void remove(map)}/></div>;
 }

@@ -16,9 +16,6 @@ export interface StudySet {
   icon: 'language' | 'biology' | 'history' | 'math' | 'general';
   cards: Flashcard[];
   updatedAt: string;
-  createdByAi?: boolean;
-  aiTopic?: string;
-  aiGenerationId?: string;
 }
 
 export interface Profile {
