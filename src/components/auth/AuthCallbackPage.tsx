@@ -4,6 +4,20 @@ import { getCurrentSession } from '../../services/authService';
 import { Logo } from '../logo/Logo';
 import { Button } from '../ui/Button';
 
+function getSafeRedirectPath(value: string | null) {
+  if (!value) return '/';
+  if (!value.startsWith('/') || value.startsWith('//') || value.includes('\\')) return '/';
+
+  try {
+    const parsed = new URL(value, window.location.origin);
+    if (parsed.origin !== window.location.origin) return '/';
+
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return '/';
+  }
+}
+
 export function AuthCallbackPage() {
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -11,6 +25,7 @@ export function AuthCallbackPage() {
     async function handleCallback() {
       const urlParams = new URLSearchParams(window.location.search);
       const urlError = urlParams.get('error_description') ?? urlParams.get('error');
+      const redirectPath = getSafeRedirectPath(urlParams.get('next'));
 
       if (urlError) {
         window.history.replaceState({}, document.title, '/auth/callback');
@@ -24,7 +39,7 @@ export function AuthCallbackPage() {
         return;
       }
 
-      window.location.replace('/');
+      window.location.replace(redirectPath);
     }
 
     void handleCallback();

@@ -42,6 +42,25 @@ interface GoogleUserInfo {
   picture?: string;
 }
 
+function getStringQueryValue(value: string | string[] | undefined) {
+  if (Array.isArray(value)) return value[0] ?? '';
+  return value ?? '';
+}
+
+function getSafeInternalPath(value: string | undefined) {
+  if (!value) return '/';
+  if (!value.startsWith('/') || value.startsWith('//') || value.includes('\\')) return '/';
+
+  try {
+    const parsed = new URL(value, 'https://studyflow.local');
+    if (parsed.origin !== 'https://studyflow.local') return '/';
+
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return '/';
+  }
+}
+
 function getCookie(request: VercelRequest, name: string) {
   const cookieHeader = request.headers.cookie ?? '';
   const cookies = cookieHeader.split(';').map((cookie) => cookie.trim());
@@ -92,9 +111,13 @@ async function handleGoogleLogin(request: VercelRequest, response: VercelRespons
   const appUrl = getAppUrl(request);
   const redirectUri = `${appUrl}/api/auth/callback`;
   const state = randomBytes(24).toString('hex');
+  const nextPath = getSafeInternalPath(getStringQueryValue(request.query.next));
   const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
 
-  response.setHeader('Set-Cookie', `studyflow_oauth_state=${state}; Path=/; HttpOnly; SameSite=Lax; Max-Age=600${secure}`);
+  response.setHeader('Set-Cookie', [
+    `studyflow_oauth_state=${state}; Path=/; HttpOnly; SameSite=Lax; Max-Age=600${secure}`,
+    `studyflow_auth_next=${encodeURIComponent(nextPath)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=600${secure}`,
+  ]);
 
   const url = new URL('https://accounts.google.com/o/oauth2/v2/auth');
   url.searchParams.set('client_id', clientId);
@@ -112,8 +135,12 @@ async function handleGoogleCallback(request: VercelRequest, response: VercelResp
   const code = typeof request.query.code === 'string' ? request.query.code : '';
   const state = typeof request.query.state === 'string' ? request.query.state : '';
   const storedState = getCookie(request, 'studyflow_oauth_state');
+  const nextPath = getSafeInternalPath(getCookie(request, 'studyflow_auth_next'));
 
-  response.setHeader('Set-Cookie', 'studyflow_oauth_state=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0');
+  response.setHeader('Set-Cookie', [
+    'studyflow_oauth_state=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0',
+    'studyflow_auth_next=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0',
+  ]);
 
   if (!code || !state || !storedState || state !== storedState) {
     response.redirect(`${appUrl}/auth/callback?error_description=${encodeURIComponent('Não foi possível validar o retorno do Google.')}`);
@@ -164,7 +191,9 @@ async function handleGoogleCallback(request: VercelRequest, response: VercelResp
 
     await upsertProfileFromSession(user);
     await setSessionCookie(response, user);
-    response.redirect(`${appUrl}/auth/callback`);
+    const callbackUrl = new URL('/auth/callback', appUrl);
+    if (nextPath !== '/') callbackUrl.searchParams.set('next', nextPath);
+    response.redirect(callbackUrl.toString());
   } catch (error) {
     console.error('Erro na callback Google/Vercel:', error);
     response.redirect(`${appUrl}/auth/callback?error_description=${encodeURIComponent('Erro inesperado ao concluir o login.')}`);

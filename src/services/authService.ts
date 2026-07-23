@@ -1,8 +1,12 @@
 import { apiGet, apiPost } from '../lib/apiClient';
 import type { AppSession } from '../types/auth';
 
-export async function signInWithGoogle() {
-  window.location.assign('/api/auth/google');
+export async function signInWithGoogle(redirectPath = '/') {
+  const loginUrl = redirectPath === '/'
+    ? '/api/auth/google'
+    : `/api/auth/google?next=${encodeURIComponent(redirectPath)}`;
+
+  window.location.assign(loginUrl);
 }
 
 export async function signOut() {

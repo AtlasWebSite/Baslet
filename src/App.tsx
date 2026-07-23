@@ -13,6 +13,7 @@ import { CreateStudySetForm } from './components/forms/CreateStudySetForm';
 import { SubscriptionPaywall } from './components/billing/SubscriptionPaywall';
 import { SubscriptionStatusCard } from './components/billing/SubscriptionStatusCard';
 import { PaymentStatusScreen } from './components/billing/PaymentStatusScreen';
+import { PaymentRedirectPage } from './components/billing/PaymentRedirectPage';
 import { Button } from './components/ui/Button';
 import { useAuth } from './hooks/useAuth';
 import { useProfile } from './hooks/useProfile';
@@ -42,10 +43,41 @@ function getPaymentReturnStatus(pathname: string): PaymentReturnStatus | undefin
   return undefined;
 }
 
+function isPaymentRedirectPath(pathname: string) {
+  return ['/pagamento', '/pagamento/', '/checkout', '/checkout/', '/payment', '/payment/'].includes(pathname);
+}
+
 export function App() {
   const auth = useAuth();
   if (window.location.pathname === '/auth/callback') return <AuthCallbackPage />;
+  if (isPaymentRedirectPath(window.location.pathname)) return <PaymentEntryPage auth={auth} />;
   return <AuthGuard session={auth.session} isLoading={auth.isLoading} error={auth.error}>{auth.user && <AuthenticatedApp user={auth.user}/>}</AuthGuard>;
+}
+
+function PaymentEntryPage({ auth }: { auth: ReturnType<typeof useAuth> }) {
+  if (auth.isLoading) return <LoadingState label="Preparando pagamento..."/>;
+  if (auth.user) return <AuthenticatedPaymentEntryPage user={auth.user}/>;
+
+  return <PaymentRedirectPage mode="guest" errorMessage={auth.error ?? ''} />;
+}
+
+function AuthenticatedPaymentEntryPage({ user }: { user: NonNullable<ReturnType<typeof useAuth>['user']> }) {
+  const billing = useSubscription(user.id);
+
+  if (billing.isLoading) return <LoadingState label="Verificando assinatura..."/>;
+
+  return (
+    <PaymentRedirectPage
+      mode={billing.isPremium ? 'active' : 'checkout'}
+      subscription={billing.subscription}
+      errorMessage={billing.errorMessage}
+      isStarting={billing.isStarting}
+      isRefreshing={billing.isRefreshing}
+      onSubscribe={() => void billing.startSubscription()}
+      onRefresh={() => void billing.refresh()}
+      onEnterApp={() => window.location.assign('/')}
+    />
+  );
 }
 
 function AuthenticatedApp({ user }: { user: NonNullable<ReturnType<typeof useAuth>['user']> }) {

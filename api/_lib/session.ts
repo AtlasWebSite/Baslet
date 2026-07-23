@@ -35,6 +35,22 @@ function serializeCookie(value: string, maxAge: number) {
   return `${COOKIE_NAME}=${encodeURIComponent(value)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure}`;
 }
 
+function appendSetCookieHeader(response: VercelResponse, cookie: string) {
+  const current = response.getHeader('Set-Cookie');
+
+  if (Array.isArray(current)) {
+    response.setHeader('Set-Cookie', [...current.map(String), cookie]);
+    return;
+  }
+
+  if (typeof current === 'string') {
+    response.setHeader('Set-Cookie', [current, cookie]);
+    return;
+  }
+
+  response.setHeader('Set-Cookie', cookie);
+}
+
 export async function createSessionToken(user: SessionUser) {
   return new SignJWT(user as unknown as Record<string, unknown>)
     .setProtectedHeader({ alg: 'HS256' })
@@ -71,9 +87,9 @@ export async function requireSessionUser(request: VercelRequest) {
 
 export async function setSessionCookie(response: VercelResponse, user: SessionUser) {
   const token = await createSessionToken(user);
-  response.setHeader('Set-Cookie', serializeCookie(token, MAX_AGE_SECONDS));
+  appendSetCookieHeader(response, serializeCookie(token, MAX_AGE_SECONDS));
 }
 
 export function clearSessionCookie(response: VercelResponse) {
-  response.setHeader('Set-Cookie', serializeCookie('', 0));
+  appendSetCookieHeader(response, serializeCookie('', 0));
 }
