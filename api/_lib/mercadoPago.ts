@@ -90,20 +90,20 @@ async function mercadoPagoRequest<T>(path: string, init?: RequestInit) {
 
   if (/payer and collector cannot be the same user/i.test(rawMessage)) {
     throw new MercadoPagoIntegrationError(
-      'Use uma conta compradora diferente da conta Mercado Pago que recebe o dinheiro. Em testes, configure MERCADO_PAGO_TEST_PAYER_USER com o usuário TESTUSER comprador.',
+      'Use uma conta compradora diferente da conta que recebe o dinheiro. Em testes, configure MERCADO_PAGO_TEST_PAYER_USER com o usuário TESTUSER comprador.',
       'same_payer_and_collector',
     );
   }
 
   if (/both payer and collector must be real or test users/i.test(rawMessage)) {
     throw new MercadoPagoIntegrationError(
-      'O pagador e o recebedor precisam ser ambos reais ou ambos de teste. Para testar assinatura, use o Access Token APP_USR da conta TESTUSER vendedora e configure MERCADO_PAGO_TEST_PAYER_USER com uma conta TESTUSER compradora diferente.',
+      'Você está misturando conta real com conta teste. Na Vercel, use em MERCADO_PAGO_ACCESS_TOKEN o Access Token da aba Testes > Credenciais de teste do Mercado Pago. Em MERCADO_PAGO_TEST_PAYER_USER, use o usuário TESTUSER comprador.',
     );
   }
 
   if (/internal server error/i.test(rawMessage)) {
     throw new MercadoPagoIntegrationError(
-      'O Mercado Pago não conseguiu criar o checkout de teste. Confira se a conta compradora de teste é do mesmo país da vendedora e se MERCADO_PAGO_TEST_PAYER_USER está com o usuário TESTUSER correto.',
+      'O Mercado Pago não conseguiu criar o checkout de teste. Confira se MERCADO_PAGO_ACCESS_TOKEN veio da aba Testes > Credenciais de teste e se MERCADO_PAGO_TEST_PAYER_USER é um usuário TESTUSER comprador do mesmo país.',
     );
   }
 
