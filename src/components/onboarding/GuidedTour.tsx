@@ -210,12 +210,23 @@ export function GuidedTour({ active, onNavigate, onComplete, onSkip }: GuidedTou
   const [showSkipDialog, setShowSkipDialog] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const titleRef = useRef<HTMLHeadingElement>(null);
+  const advanceLockedRef = useRef(false);
   const step = tourSteps[stepIndex];
   const Icon = stepIcons[stepIndex] ?? Sparkles;
   const isFirst = stepIndex === 0;
   const isLast = stepIndex === tourSteps.length - 1;
   const mustInteract = Boolean(step.interactionSelector);
   const canContinue = !mustInteract || interactionDone;
+
+  const advanceBy = useCallback((direction: 1 | -1) => {
+    if (advanceLockedRef.current) return;
+
+    advanceLockedRef.current = true;
+    setStepIndex((current) => Math.min(Math.max(current + direction, 0), tourSteps.length - 1));
+    window.setTimeout(() => {
+      advanceLockedRef.current = false;
+    }, 360);
+  }, []);
 
   const refreshHighlight = useCallback(() => {
     const target = getVisibleTarget(step.target);
@@ -256,17 +267,18 @@ export function GuidedTour({ active, onNavigate, onComplete, onSkip }: GuidedTou
 
     const trackInteraction = (event: MouseEvent) => {
       const target = event.target as HTMLElement | null;
+      if (target?.closest('.guided-tour-card, .modal')) return;
       if (!target?.closest(step.interactionSelector ?? '')) return;
 
       setInteractionDone(true);
 
       if (!step.autoAdvanceAfterInteraction) return;
-      window.setTimeout(() => setStepIndex((current) => Math.min(current + 1, tourSteps.length - 1)), 420);
+      window.setTimeout(() => advanceBy(1), 420);
     };
 
     document.addEventListener('click', trackInteraction, true);
     return () => document.removeEventListener('click', trackInteraction, true);
-  }, [active, step]);
+  }, [active, advanceBy, step]);
 
   const complete = async (callback: () => Promise<void> | void) => {
     setIsSaving(true);
@@ -285,12 +297,12 @@ export function GuidedTour({ active, onNavigate, onComplete, onSkip }: GuidedTou
       return;
     }
 
-    setStepIndex((current) => current + 1);
+    advanceBy(1);
   };
 
   const goBack = () => {
     if (isFirst) return;
-    setStepIndex((current) => current - 1);
+    advanceBy(-1);
   };
 
   const cardPosition = useMemo(() => getCardPosition(highlight, step.placement ?? 'bottom'), [highlight, step.placement]);
@@ -326,8 +338,8 @@ export function GuidedTour({ active, onNavigate, onComplete, onSkip }: GuidedTou
           <footer>
             <button type="button" className="skip-button" onClick={() => setShowSkipDialog(true)}>Pular tutorial</button>
             <div>
-              <Button variant="secondary" icon={<ArrowLeft size={16} />} onClick={goBack} disabled={isFirst || isSaving}>Voltar</Button>
-              <Button icon={isLast ? <CheckCircle2 size={16} /> : <ArrowRight size={16} />} onClick={goNext} disabled={!canContinue || isSaving} loading={isSaving}>
+              <Button type="button" variant="secondary" icon={<ArrowLeft size={16} />} onClick={goBack} disabled={isFirst || isSaving}>Voltar</Button>
+              <Button type="button" icon={isLast ? <CheckCircle2 size={16} /> : <ArrowRight size={16} />} onClick={goNext} disabled={!canContinue || isSaving} loading={isSaving}>
                 {isLast ? 'Finalizar' : 'Próximo'}
               </Button>
             </div>
@@ -336,8 +348,8 @@ export function GuidedTour({ active, onNavigate, onComplete, onSkip }: GuidedTou
       </div>
       <Modal open={showSkipDialog} onClose={() => setShowSkipDialog(false)} title="Pular tour guiado" description="Você pode explorar o StudyFlow por conta própria e reiniciar este tour pelo perfil quando quiser." className="modal--tour-skip">
         <div className="tour-skip-dialog">
-          <Button variant="secondary" onClick={() => setShowSkipDialog(false)}>Continuar tutorial</Button>
-          <Button variant="primary" onClick={() => void complete(onSkip)} loading={isSaving}>Pular</Button>
+          <Button type="button" variant="secondary" onClick={() => setShowSkipDialog(false)}>Continuar tutorial</Button>
+          <Button type="button" variant="primary" onClick={() => void complete(onSkip)} loading={isSaving}>Pular</Button>
         </div>
       </Modal>
     </>
