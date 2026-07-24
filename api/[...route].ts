@@ -16,18 +16,17 @@ import {
   markStarterContentCreated,
   saveProgress,
   saveQuiz,
-  saveMercadoPagoSubscriptionForUser,
-  updateSubscriptionFromMercadoPago,
+  saveMercadoPagoPaymentPreferenceForUser,
+  updateSubscriptionFromMercadoPagoPayment,
   updateMentalMapForUser,
 } from './_lib/data.js';
 import { upsertProfileFromSession } from './_lib/db.js';
 import { getAppUrl, json, methodNotAllowed, readJsonBody, requireEnvironment } from './_lib/http.js';
 import {
-  cancelMercadoPagoSubscription,
-  createMercadoPagoSubscription,
+  createMercadoPagoPaymentPreference,
   extractMercadoPagoWebhookResourceId,
-  getMercadoPagoCheckoutUrl,
-  getMercadoPagoSubscription,
+  getMercadoPagoPayment,
+  getMercadoPagoPreferenceCheckoutUrl,
   isMercadoPagoWebhookSignatureValid,
 } from './_lib/mercadoPago.js';
 import {
@@ -109,18 +108,6 @@ function unauthorized(response: VercelResponse, message = 'Entre novamente para 
 
 function routeNotFound(response: VercelResponse) {
   json(response, 404, { error: 'Rota não encontrada.' });
-}
-
-async function syncSubscriptionWithMercadoPago(preapprovalId?: string | null) {
-  if (!preapprovalId || !process.env.MERCADO_PAGO_ACCESS_TOKEN) return null;
-
-  try {
-    const preapproval = await getMercadoPagoSubscription(preapprovalId);
-    return updateSubscriptionFromMercadoPago(preapproval);
-  } catch (error) {
-    console.error('Erro ao sincronizar assinatura Mercado Pago:', error);
-    return null;
-  }
 }
 
 async function handleGoogleLogin(request: VercelRequest, response: VercelResponse) {
@@ -393,9 +380,7 @@ async function handleSubscription(request: VercelRequest, response: VercelRespon
 
   try {
     const user = await requireSessionUser(request);
-    const existingSubscription = await getSubscription(user);
-    const syncedSubscription = await syncSubscriptionWithMercadoPago(existingSubscription?.mercadoPagoPreapprovalId);
-    const subscription = syncedSubscription ?? existingSubscription;
+    const subscription = await getSubscription(user);
     json(response, 200, { subscription });
   } catch {
     unauthorized(response, 'Entre novamente para verificar sua assinatura.');
@@ -410,12 +395,6 @@ async function handleSubscriptionCancel(request: VercelRequest, response: Vercel
 
   try {
     const user = await requireSessionUser(request);
-    const subscription = await getSubscription(user);
-
-    if (subscription?.mercadoPagoPreapprovalId && process.env.MERCADO_PAGO_ACCESS_TOKEN) {
-      await cancelMercadoPagoSubscription(subscription.mercadoPagoPreapprovalId);
-    }
-
     await cancelUserSubscription(user);
     json(response, 200, { status: 'active' });
   } catch (error) {
@@ -438,27 +417,25 @@ async function handleBillingCheckout(request: VercelRequest, response: VercelRes
   try {
     const user = await requireSessionUser(request);
     const appUrl = getAppUrl(request);
-    const existingSubscription = await getSubscription(user);
-    const syncedSubscription = await syncSubscriptionWithMercadoPago(existingSubscription?.mercadoPagoPreapprovalId);
-    const subscription = syncedSubscription ?? existingSubscription;
+    const subscription = await getSubscription(user);
 
     if (subscription?.status === 'active') {
       json(response, 200, {
         checkout: {
           checkoutUrl: `${appUrl}/`,
-          preapprovalId: subscription.mercadoPagoPreapprovalId ?? '',
+          preapprovalId: subscription.mercadoPagoPreferenceId ?? subscription.mercadoPagoPreapprovalId ?? '',
           status: 'active',
         },
       });
       return;
     }
 
-    const preapproval = await createMercadoPagoSubscription(user, request);
-    const savedSubscription = await saveMercadoPagoSubscriptionForUser(user, preapproval);
+    const preference = await createMercadoPagoPaymentPreference(user, request);
+    const savedSubscription = await saveMercadoPagoPaymentPreferenceForUser(user, preference);
     json(response, 200, {
       checkout: {
-        checkoutUrl: getMercadoPagoCheckoutUrl(preapproval),
-        preapprovalId: preapproval.id,
+        checkoutUrl: getMercadoPagoPreferenceCheckoutUrl(preference),
+        preapprovalId: preference.id,
         status: savedSubscription.status,
       },
     });
@@ -488,14 +465,20 @@ async function handleMercadoPagoWebhook(request: VercelRequest, response: Vercel
       return;
     }
 
+    const notificationType = typeof body.type === 'string' ? body.type : typeof body.topic === 'string' ? body.topic : '';
+    if (notificationType && notificationType !== 'payment') {
+      json(response, 200, { ok: true, ignored: true });
+      return;
+    }
+
     if (!isMercadoPagoWebhookSignatureValid(request, resourceId)) {
       console.error('Webhook Mercado Pago com assinatura inválida.');
       json(response, 401, { error: 'Webhook inválido.' });
       return;
     }
 
-    const preapproval = await getMercadoPagoSubscription(resourceId);
-    await updateSubscriptionFromMercadoPago(preapproval);
+    const payment = await getMercadoPagoPayment(resourceId);
+    await updateSubscriptionFromMercadoPagoPayment(payment);
     json(response, 200, { ok: true });
   } catch (error) {
     console.error('Erro no webhook Mercado Pago:', error);

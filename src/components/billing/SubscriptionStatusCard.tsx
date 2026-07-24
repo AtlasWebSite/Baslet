@@ -3,11 +3,11 @@ import type { Subscription } from '../../types/subscription';
 import { Button } from '../ui/Button';
 
 const statusLabels = {
-  inactive: 'Assinatura inativa',
+  inactive: 'Acesso inativo',
   pending: 'Pagamento em análise',
   active: 'Premium ativo',
-  paused: 'Assinatura pausada',
-  cancelled: 'Assinatura cancelada',
+  paused: 'Acesso pausado',
+  cancelled: 'Acesso encerrado',
   rejected: 'Pagamento não aprovado',
 };
 
@@ -30,7 +30,7 @@ export function SubscriptionStatusCard({
 }) {
   const status = subscription?.status ?? 'inactive';
   const cancellationScheduled = status === 'active' && Boolean(subscription?.cancelledAt);
-  const label = cancellationScheduled ? 'Premium até o fim do ciclo' : statusLabels[status];
+  const label = cancellationScheduled ? 'Premium até o fim do período' : statusLabels[status];
 
   return (
     <section className={`subscription-status subscription-status--${status}`}>
@@ -40,14 +40,14 @@ export function SubscriptionStatusCard({
         <strong><ShieldCheck size={15} />{label}</strong>
       </header>
       <div className="subscription-status__grid">
-        <div><small>Valor mensal</small><strong>R$ 11,90</strong></div>
+        <div><small>Valor</small><strong>R$ 11,90 / 30 dias</strong></div>
         <div><small>Ativação</small><strong><CalendarDays size={14} />{formatDate(subscription?.startedAt ?? null)}</strong></div>
-        <div><small>{cancellationScheduled ? 'Acesso até' : 'Próxima cobrança'}</small><strong>{formatDate(subscription?.nextPaymentAt ?? null)}</strong></div>
+        <div><small>Acesso até</small><strong>{formatDate(subscription?.nextPaymentAt ?? null)}</strong></div>
       </div>
-      {cancellationScheduled && <p className="subscription-status__note">A renovação foi cancelada, mas o app continua liberado até o fim do mês já pago.</p>}
+      {cancellationScheduled && <p className="subscription-status__note">O app continua liberado até o fim do período já pago.</p>}
       <div className="subscription-status__actions">
         <Button variant="secondary" icon={<RefreshCw size={16} />} loading={refreshing} onClick={onRefresh}>Verificar novamente</Button>
-        {status === 'active' && !cancellationScheduled ? <Button variant="ghost" icon={<XCircle size={16} />} loading={cancelling} onClick={onCancel}>Cancelar renovação</Button> : <Button onClick={onSubscribe}>{cancellationScheduled ? 'Reativar renovação' : 'Assinar ou reativar'}</Button>}
+        {status === 'active' && !cancellationScheduled ? <Button variant="ghost" icon={<XCircle size={16} />} loading={cancelling} onClick={onCancel}>Encerrar após período pago</Button> : <Button onClick={onSubscribe}>{cancellationScheduled ? 'Pagar novo período' : 'Pagar ou reativar'}</Button>}
       </div>
     </section>
   );

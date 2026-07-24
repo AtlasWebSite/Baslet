@@ -4,6 +4,8 @@ export interface Subscription {
   id: string;
   userId: string;
   mercadoPagoPreapprovalId: string | null;
+  mercadoPagoPreferenceId: string | null;
+  mercadoPagoPaymentId: string | null;
   mercadoPagoPayerId: string | null;
   status: SubscriptionStatus;
   planName: string;
