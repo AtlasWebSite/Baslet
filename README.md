@@ -22,7 +22,7 @@ APP_URL=http://localhost:3000
 POSTGRES_URL=postgres://usuario:senha@host/database
 MERCADO_PAGO_ACCESS_TOKEN=TEST-ou-APP_USR-token
 MERCADO_PAGO_WEBHOOK_SECRET=segredo-do-webhook
-MERCADO_PAGO_TEST_PAYER_USER=TESTUSER-comprador-de-teste
+MERCADO_PAGO_TEST_PAYER_USER=
 MERCADO_PAGO_TEST_PAYER_EMAIL=
 ```
 
@@ -82,10 +82,13 @@ Para testar:
 
 ```env
 MERCADO_PAGO_ACCESS_TOKEN=TEST-seu-token-da-aba-testes
-MERCADO_PAGO_TEST_PAYER_USER=TESTUSER-da-conta-compradora
+MERCADO_PAGO_TEST_PAYER_USER=
+MERCADO_PAGO_TEST_PAYER_EMAIL=
 ```
 
-Se o Mercado Pago mostrar o usuário comprador no formato `TESTUSER...`, coloque esse valor diretamente em `MERCADO_PAGO_TEST_PAYER_USER`. O backend converte para o formato aceito pela API de assinaturas.
+Com token `TEST-`, não configure `TESTUSER` no backend. O StudyFlow envia o e-mail da conta Google logada como `payer_email`, e o pagamento deve ser feito no checkout com cartão de teste.
+
+Se a Vercel ainda tiver `MERCADO_PAGO_TEST_PAYER_USER` ou `MERCADO_PAGO_TEST_PAYER_EMAIL` preenchidos, apague os valores, salve e faça redeploy.
 
 Para produção:
 

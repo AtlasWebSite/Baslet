@@ -95,13 +95,11 @@ function normalizeTestPayerEmail(value: string) {
 
 function getPayerEmail(user: SessionUser) {
   const testPayer = getConfiguredTestPayer();
-  if (testPayer) return normalizeTestPayerEmail(testPayer);
-
   if (isTestAccessToken()) {
-    throw new MercadoPagoIntegrationError(
-      'Para testar assinaturas, configure MERCADO_PAGO_TEST_PAYER_USER com o usuário TESTUSER comprador do Mercado Pago.',
-    );
+    return user.email;
   }
+
+  if (testPayer) return normalizeTestPayerEmail(testPayer);
 
   return user.email;
 }
@@ -124,14 +122,14 @@ async function mercadoPagoRequest<T>(path: string, init?: RequestInit) {
 
   if (/payer and collector cannot be the same user/i.test(rawMessage)) {
     throw new MercadoPagoIntegrationError(
-      'Use uma conta compradora diferente da conta que recebe o dinheiro. Em testes, configure MERCADO_PAGO_TEST_PAYER_USER com o usuário TESTUSER comprador.',
+      'Use uma conta compradora diferente da conta que recebe o dinheiro. Abra o checkout em janela anônima e não use a conta vendedora para pagar.',
       'same_payer_and_collector',
     );
   }
 
   if (/both payer and collector must be real or test users/i.test(rawMessage)) {
     throw new MercadoPagoIntegrationError(
-      'Você está misturando ambiente real com ambiente de teste. Para testar assinaturas, use Access Token TEST- junto com MERCADO_PAGO_TEST_PAYER_USER de uma conta TESTUSER compradora.',
+      'O Mercado Pago ainda detectou mistura entre teste e produção. Para token TEST-, remova MERCADO_PAGO_TEST_PAYER_USER e MERCADO_PAGO_TEST_PAYER_EMAIL da Vercel, salve e faça redeploy.',
     );
   }
 
