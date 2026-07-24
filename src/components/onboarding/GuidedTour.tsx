@@ -218,14 +218,17 @@ export function GuidedTour({ active, onNavigate, onComplete, onSkip }: GuidedTou
   const mustInteract = Boolean(step.interactionSelector);
   const canContinue = !mustInteract || interactionDone;
 
-  const advanceBy = useCallback((direction: 1 | -1) => {
+  const moveToStep = useCallback((fromIndex: number, targetIndex: number) => {
     if (advanceLockedRef.current) return;
 
     advanceLockedRef.current = true;
-    setStepIndex((current) => Math.min(Math.max(current + direction, 0), tourSteps.length - 1));
+    setStepIndex((current) => {
+      if (current !== fromIndex) return current;
+      return Math.min(Math.max(targetIndex, 0), tourSteps.length - 1);
+    });
     window.setTimeout(() => {
       advanceLockedRef.current = false;
-    }, 360);
+    }, 650);
   }, []);
 
   const refreshHighlight = useCallback(() => {
@@ -273,12 +276,12 @@ export function GuidedTour({ active, onNavigate, onComplete, onSkip }: GuidedTou
       setInteractionDone(true);
 
       if (!step.autoAdvanceAfterInteraction) return;
-      window.setTimeout(() => advanceBy(1), 420);
+      window.setTimeout(() => moveToStep(stepIndex, stepIndex + 1), 420);
     };
 
     document.addEventListener('click', trackInteraction, true);
     return () => document.removeEventListener('click', trackInteraction, true);
-  }, [active, advanceBy, step]);
+  }, [active, moveToStep, step, stepIndex]);
 
   const complete = async (callback: () => Promise<void> | void) => {
     setIsSaving(true);
@@ -297,12 +300,12 @@ export function GuidedTour({ active, onNavigate, onComplete, onSkip }: GuidedTou
       return;
     }
 
-    advanceBy(1);
+    moveToStep(stepIndex, stepIndex + 1);
   };
 
   const goBack = () => {
     if (isFirst) return;
-    advanceBy(-1);
+    moveToStep(stepIndex, stepIndex - 1);
   };
 
   const cardPosition = useMemo(() => getCardPosition(highlight, step.placement ?? 'bottom'), [highlight, step.placement]);
@@ -325,6 +328,7 @@ export function GuidedTour({ active, onNavigate, onComplete, onSkip }: GuidedTou
           role="dialog"
           aria-modal="false"
           aria-labelledby="guided-tour-title"
+          onClickCapture={(event) => event.stopPropagation()}
         >
           <header>
             <span><Icon size={19} /></span>
