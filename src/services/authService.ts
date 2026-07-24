@@ -1,6 +1,8 @@
 import { apiDelete, apiGet, apiPost } from '../lib/apiClient';
 import type { AppSession } from '../types/auth';
 
+const LOCAL_ACCOUNT_KEYS = ['studyflow_sets_v1'];
+
 export async function signInWithGoogle(redirectPath = '/') {
   const loginUrl = redirectPath === '/'
     ? '/api/auth/google'
@@ -16,10 +18,17 @@ export async function signOut() {
 
 export async function deleteAccount() {
   await apiDelete<{ ok: true }>('/api/account');
+  clearLocalAccountData();
   window.location.replace('/');
 }
 
 export async function getCurrentSession() {
   const { session } = await apiGet<{ session: AppSession | null }>('/api/auth/session');
   return session;
+}
+
+function clearLocalAccountData() {
+  for (const key of LOCAL_ACCOUNT_KEYS) {
+    localStorage.removeItem(key);
+  }
 }
