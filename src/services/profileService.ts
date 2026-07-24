@@ -11,3 +11,8 @@ export async function completeOnboarding(_userId: string) {
   const { profile } = await apiPost<{ profile: Profile }>('/api/profile/onboarding', {});
   return profile;
 }
+
+export async function completeWalkthrough() {
+  const { profile } = await apiPost<{ profile: Profile }>('/api/profile/walkthrough', {});
+  return profile;
+}

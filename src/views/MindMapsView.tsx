@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { BrainCircuit, Network, Plus, Sparkles } from 'lucide-react';
 import type { StudySet, ToastMessage } from '../types';
 import type { MentalMap, MindMapEdge, MindMapMode, MindMapNode } from '../types/mentalMap';
@@ -19,9 +19,10 @@ interface MindMapsViewProps {
   onCreateSet: () => void;
   onStudyFlashcard: (studySet: StudySet, flashcardId: string) => void;
   notify: (type: ToastMessage['type'], message: string) => void;
+  tourActive?: boolean;
 }
 
-export function MindMapsView({ userId, studySets, isPremium, onRequirePremium, onCreateSet, onStudyFlashcard, notify }: MindMapsViewProps) {
+export function MindMapsView({ userId, studySets, isPremium, onRequirePremium, onCreateSet, onStudyFlashcard, notify, tourActive = false }: MindMapsViewProps) {
   const { maps, isLoading, error, saveMap, saveChanges, removeMap } = useMentalMaps(userId);
   const [selectedSetId, setSelectedSetId] = useState('');
   const [nodes, setNodes] = useState<MindMapNode[]>([]);
@@ -35,6 +36,23 @@ export function MindMapsView({ userId, studySets, isPremium, onRequirePremium, o
   const [saving, setSaving] = useState(false);
   const selectedSet = studySets.find((studySet) => studySet.id === selectedSetId);
   const selectedNode = useMemo(() => nodes.find((node) => node.id === selectedNodeId), [nodes, selectedNodeId]);
+
+  useEffect(() => {
+    if (!tourActive || nodes.length || generating) return;
+
+    const demoSet = studySets.find((studySet) => studySet.cards.length > 0);
+    if (!demoSet) return;
+
+    const generated = generateAdvancedMindMapFromFlashcards(demoSet);
+    setSelectedSetId(demoSet.id);
+    setNodes(generated.nodes);
+    setEdges(generated.edges);
+    setMode(generated.mode);
+    setTitle(demoSet.title);
+    setActiveMap(undefined);
+    setExpandedTermIds(new Set());
+    setSelectedNodeId(undefined);
+  }, [tourActive, studySets, nodes.length, generating]);
 
   if (!studySets.length) {
     return <div className="view"><EmptyState icon={<BrainCircuit size={32}/>} title="Nenhum flashcard disponível" description="Crie um conjunto de flashcards antes de gerar um mapa mental." action={<Button onClick={onCreateSet}>Criar conjunto</Button>}/></div>;

@@ -4,6 +4,7 @@ import {
   BookOpenCheck,
   Crown,
   LogOut,
+  MousePointerClick,
   Palette,
   PlayCircle,
   ShieldAlert,
@@ -112,11 +113,9 @@ export function ProfileView({
             Ver assinatura
           </Button>
 
-          {isPremium && (
-            <Button variant="ghost" icon={<PlayCircle size={17} />} onClick={onReplayTutorial}>
-              Ver tutorial
-            </Button>
-          )}
+          <Button variant="ghost" icon={<PlayCircle size={17} />} onClick={onReplayTutorial}>
+            Ver tutorial
+          </Button>
         </div>
 
         <div className="profile-stats">
@@ -176,6 +175,17 @@ export function ProfileView({
             >
               <span />
             </button>
+          </div>
+
+          <div className="setting-row setting-row--action">
+            <span><MousePointerClick size={20} /></span>
+            <div>
+              <strong>Tour guiado do app</strong>
+              <small>Veja novamente onde ficam flashcards, testes e mapas mentais</small>
+            </div>
+            <Button variant="secondary" onClick={onReplayTutorial}>
+              Reiniciar tour
+            </Button>
           </div>
         </section>
 

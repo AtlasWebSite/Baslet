@@ -19,6 +19,8 @@ async function createSchema() {
       email text not null,
       onboarding_completed boolean not null default false,
       onboarding_completed_at timestamptz,
+      walkthrough_completed boolean not null default false,
+      walkthrough_completed_at timestamptz,
       starter_content_created boolean not null default false,
       created_at timestamptz not null default now(),
       updated_at timestamptz not null default now()
@@ -118,6 +120,8 @@ async function createSchema() {
   await sql`alter table subscriptions add column if not exists mercado_pago_preapproval_id text`;
   await sql`alter table subscriptions add column if not exists mercado_pago_payer_id text`;
   await sql`alter table subscriptions add column if not exists mercado_pago_checkout_url text`;
+  await sql`alter table profiles add column if not exists walkthrough_completed boolean not null default false`;
+  await sql`alter table profiles add column if not exists walkthrough_completed_at timestamptz`;
 
   await sql`create index if not exists study_sets_user_idx on study_sets(user_id)`;
   await sql`create index if not exists flashcards_user_set_idx on flashcards(user_id, study_set_id)`;

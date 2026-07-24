@@ -22,7 +22,7 @@ export function MindMapSetSelector({
   const selected = studySets.find((set) => set.id === selectedId);
 
   return (
-    <section className="map-selector">
+    <section className="map-selector" data-tour="mindmap-selector">
       <span className="map-selector__icon"><Network size={22} /></span>
       <div>
         <span className="eyebrow">CONTEÚDO DE ORIGEM</span>
@@ -34,6 +34,7 @@ export function MindMapSetSelector({
         {selected && !selected.cards.length && <small>Este conjunto ainda não possui flashcards.</small>}
       </div>
       <Button
+        data-tour="mindmap-generate"
         className={!isPremium ? 'premium-action-button' : undefined}
         loading={generating}
         disabled={!selectedId || !selected?.cards.length}

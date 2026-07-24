@@ -25,6 +25,8 @@ export interface Profile {
   email: string;
   onboarding_completed: boolean;
   onboarding_completed_at: string | null;
+  walkthrough_completed?: boolean;
+  walkthrough_completed_at?: string | null;
   starter_content_created?: boolean;
   created_at: string;
   updated_at: string;

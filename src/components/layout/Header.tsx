@@ -20,7 +20,7 @@ export function Header({ view, search, onSearch, onCreate, userName, showStudyAc
       {showStudyActions && <div className="topbar__actions">
         <label className="search"><Search size={18} /><input value={search} onChange={(event) => onSearch(event.target.value)} placeholder="Buscar conjuntos..." aria-label="Buscar conjuntos" /></label>
         <button className="icon-button notification" aria-label="Notificações"><Bell size={20} /><span /></button>
-        <Button icon={<Plus size={18} />} onClick={onCreate}>Novo conjunto</Button>
+        <span data-tour="create-study-set"><Button icon={<Plus size={18} />} onClick={onCreate}>Novo conjunto</Button></span>
       </div>}
     </header>
   );

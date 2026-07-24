@@ -33,7 +33,7 @@ export function MindMapToolbar({
   onSave,
 }: MindMapToolbarProps) {
   return (
-    <div className="mind-toolbar">
+    <div className="mind-toolbar" data-tour="mindmap-toolbar">
       <div className="mind-toolbar__zoom">
         <button onClick={() => onZoom(Math.max(.35, zoom - .1))} aria-label="Diminuir zoom"><Minus size={17} /></button>
         <span>{Math.round(zoom * 100)}%</span>

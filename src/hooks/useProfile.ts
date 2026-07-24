@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Profile } from '../types';
 import type { AppUser } from '../types/auth';
-import { completeOnboarding, getOrCreateProfile } from '../services/profileService';
+import { completeOnboarding, completeWalkthrough, getOrCreateProfile } from '../services/profileService';
 
 export function useProfile(user?: AppUser) {
   const [profile, setProfile] = useState<Profile>();
@@ -20,5 +20,11 @@ export function useProfile(user?: AppUser) {
     setProfile(updated);
   }, [user]);
 
-  return { profile, isLoading, error, finishOnboarding };
+  const finishWalkthrough = useCallback(async () => {
+    if (!user) return;
+    const updated = await completeWalkthrough();
+    setProfile(updated);
+  }, [user]);
+
+  return { profile, isLoading, error, finishOnboarding, finishWalkthrough };
 }

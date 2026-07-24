@@ -3,6 +3,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import {
   cancelUserSubscription,
   completeProfileOnboarding,
+  completeProfileWalkthrough,
   createMentalMapForUser,
   createStarterStudySets,
   createStudySetForUser,
@@ -511,6 +512,21 @@ async function handleMercadoPagoWebhook(request: VercelRequest, response: Vercel
   }
 }
 
+async function handleProfileWalkthrough(request: VercelRequest, response: VercelResponse) {
+  if (getMethod(request) !== 'POST') {
+    methodNotAllowed(response);
+    return;
+  }
+
+  try {
+    const user = await requireSessionUser(request);
+    const profile = await completeProfileWalkthrough(user);
+    json(response, 200, { profile });
+  } catch {
+    json(response, 500, { error: 'Não foi possível salvar o tour guiado.' });
+  }
+}
+
 async function handleAccount(request: VercelRequest, response: VercelResponse) {
   if (getMethod(request) !== 'DELETE') {
     methodNotAllowed(response);
@@ -609,6 +625,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
 
   if (resource === 'profile' && !action) return handleProfile(request, response);
   if (resource === 'profile' && action === 'onboarding') return handleProfileOnboarding(request, response);
+  if (resource === 'profile' && action === 'walkthrough') return handleProfileWalkthrough(request, response);
   if (resource === 'profile' && action === 'starter-content') return handleProfileStarterContent(request, response);
 
   if (resource === 'study-sets' && !action) return handleStudySets(request, response);

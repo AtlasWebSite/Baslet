@@ -5,11 +5,11 @@ import { Logo } from '../logo/Logo';
 
 export function Sidebar({ activeView, onNavigate, name, avatarUrl, isPremium }: { activeView: ViewId; onNavigate: (view: ViewId) => void; name: string; avatarUrl?: string | null; isPremium: boolean }) {
   return (
-    <aside className="sidebar">
+    <aside className="sidebar" data-tour="main-navigation">
       <button className="brand" onClick={() => onNavigate('home')} aria-label="Ir para o início"><Logo /></button>
       <nav aria-label="Navegação principal">
         {navigationItems.map(({ id, label, icon: Icon }) => (
-          <button key={id} className={activeView === id ? 'nav-item active' : 'nav-item'} onClick={() => onNavigate(id)}>
+          <button key={id} className={activeView === id ? 'nav-item active' : 'nav-item'} data-tour={`nav-${id}`} onClick={() => onNavigate(id)}>
             <Icon size={20} /><span>{label}</span>
           </button>
         ))}

@@ -30,7 +30,7 @@ function createQuestions(studySet?: StudySet) {
   });
 }
 
-export function QuizView({ studySets, userId, isPremium, onRequirePremium, onError }: { studySets: StudySet[]; userId: string; isPremium: boolean; onRequirePremium: (message?: string) => void; onError: (message: string) => void }) {
+export function QuizView({ studySets, userId, isPremium, demoMode = false, onRequirePremium, onError }: { studySets: StudySet[]; userId: string; isPremium: boolean; demoMode?: boolean; onRequirePremium: (message?: string) => void; onError: (message: string) => void }) {
   const setsWithCards = useMemo(() => studySets.filter((studySet) => studySet.cards.length > 0), [studySets]);
   const [selectedSetId, setSelectedSetId] = useState(() => setsWithCards[0]?.id ?? '');
   const selectedSet = setsWithCards.find((studySet) => studySet.id === selectedSetId) ?? setsWithCards[0];
@@ -103,6 +103,8 @@ export function QuizView({ studySets, userId, isPremium, onRequirePremium, onErr
 
     setFinished(true);
     const finalScore = score;
+    if (demoMode) return;
+
     if (!isPremium) {
       onRequirePremium('Você pode fazer o teste de demonstração, mas precisa assinar para salvar resultados e progresso.');
       return;
@@ -133,15 +135,15 @@ export function QuizView({ studySets, userId, isPremium, onRequirePremium, onErr
       <div className="quiz-shell">
         <div className="quiz-header">
           <div><span>{selectedSet.title} · Questão {current + 1} de {questions.length}</span><strong>{score} acertos</strong></div>
-          <div className="session-progress"><span style={{ width: `${((current + 1) / questions.length) * 100}%` }} /></div>
+          <div className="session-progress" data-tour="quiz-progress"><span style={{ width: `${((current + 1) / questions.length) * 100}%` }} /></div>
         </div>
         <div className="quiz-question">
           <span className="eyebrow">ESCOLHA A DEFINIÇÃO CORRETA</span>
           <h2>O que significa “{question.term}”?</h2>
-          <div className="options-list">{question.options.map((option, index) => {
+          <div className="options-list" data-tour="quiz-options">{question.options.map((option, index) => {
             const isCorrect = answer && option === question.answer;
             const isWrong = answer && option === answer.selected && !answer.correct;
-            return <button key={`${option}-${index}`} onClick={() => select(option)} className={isCorrect ? 'correct' : isWrong ? 'wrong' : ''} disabled={Boolean(answer)}><span>{String.fromCharCode(65 + index)}</span><strong>{option}</strong>{isCorrect && <CheckCircle2 size={20} />}{isWrong && <CircleX size={20} />}</button>;
+            return <button key={`${option}-${index}`} data-tour={index === 0 ? 'quiz-answer' : undefined} onClick={() => select(option)} className={isCorrect ? 'correct' : isWrong ? 'wrong' : ''} disabled={Boolean(answer)}><span>{String.fromCharCode(65 + index)}</span><strong>{option}</strong>{isCorrect && <CheckCircle2 size={20} />}{isWrong && <CircleX size={20} />}</button>;
           })}</div>
         </div>
         <div className="quiz-footer"><p className={answer?.correct ? 'success-text' : answer ? 'error-text' : ''}>{answer?.correct ? <><Check size={17} /> Resposta certa!</> : answer ? `A resposta correta é: ${question.answer}` : 'Selecione uma alternativa para continuar.'}</p><Button onClick={next} disabled={!answer}>{current === questions.length - 1 ? 'Ver resultado' : 'Próxima questão'}</Button></div>
@@ -154,7 +156,7 @@ function QuizSetSelector({ studySets, selectedSetId, onChange }: { studySets: St
   const selectedSet = studySets.find((studySet) => studySet.id === selectedSetId) ?? studySets[0];
 
   return (
-    <section className="quiz-set-selector">
+    <section className="quiz-set-selector" data-tour="quiz-selector">
       <span><Shuffle size={21} /></span>
       <div>
         <small>CONTEÚDO DO TESTE</small>

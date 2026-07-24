@@ -42,6 +42,8 @@ function mapProfile(row: Record<string, unknown>) {
     email: String(row.email ?? ''),
     onboarding_completed: Boolean(row.onboarding_completed),
     onboarding_completed_at: typeof row.onboarding_completed_at === 'string' ? row.onboarding_completed_at : row.onboarding_completed_at ? new Date(String(row.onboarding_completed_at)).toISOString() : null,
+    walkthrough_completed: Boolean(row.walkthrough_completed),
+    walkthrough_completed_at: typeof row.walkthrough_completed_at === 'string' ? row.walkthrough_completed_at : row.walkthrough_completed_at ? new Date(String(row.walkthrough_completed_at)).toISOString() : null,
     starter_content_created: Boolean(row.starter_content_created),
     created_at: new Date(String(row.created_at)).toISOString(),
     updated_at: new Date(String(row.updated_at)).toISOString(),
@@ -222,6 +224,17 @@ export async function createStarterStudySets(user: SessionUser, starterStudySets
 export async function deleteStudyData(user: SessionUser) {
   await ensureSchema();
   await sql`delete from study_sets where user_id = ${user.id}`;
+}
+
+export async function completeProfileWalkthrough(user: SessionUser) {
+  await ensureSchema();
+  const { rows } = await sql`
+    update profiles
+    set walkthrough_completed = true, walkthrough_completed_at = now(), updated_at = now()
+    where id = ${user.id}
+    returning *
+  `;
+  return mapProfile(rows[0] ?? await getProfile(user));
 }
 
 export async function deleteUserAccount(user: SessionUser) {
