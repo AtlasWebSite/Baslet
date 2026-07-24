@@ -15,7 +15,6 @@ interface TourStep {
   placement?: TourPlacement;
   actionHint?: string;
   interactionSelector?: string;
-  autoAdvanceAfterInteraction?: boolean;
 }
 
 interface HighlightRect {
@@ -56,9 +55,7 @@ const tourSteps: TourStep[] = [
     title: 'Abra uma sessão de estudo',
     description: 'Clique em Estudar para abrir o primeiro flashcard do conjunto destacado.',
     placement: 'top',
-    actionHint: 'Clique no botão Estudar para continuar.',
-    interactionSelector: '[data-tour="study-set-study-button"]',
-    autoAdvanceAfterInteraction: true,
+    actionHint: 'Observe onde fica o botão Estudar. No tour, use Próximo para abrir a demonstração.',
   },
   {
     id: 'flip-card',
@@ -274,14 +271,11 @@ export function GuidedTour({ active, onNavigate, onComplete, onSkip }: GuidedTou
       if (!target?.closest(step.interactionSelector ?? '')) return;
 
       setInteractionDone(true);
-
-      if (!step.autoAdvanceAfterInteraction) return;
-      window.setTimeout(() => moveToStep(stepIndex, stepIndex + 1), 420);
     };
 
     document.addEventListener('click', trackInteraction, true);
     return () => document.removeEventListener('click', trackInteraction, true);
-  }, [active, moveToStep, step, stepIndex]);
+  }, [active, step]);
 
   const complete = async (callback: () => Promise<void> | void) => {
     setIsSaving(true);
