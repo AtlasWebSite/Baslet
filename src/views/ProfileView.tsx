@@ -23,7 +23,7 @@ interface ProfileViewProps {
   isPremium: boolean;
   onBilling: () => void;
   onClear: () => Promise<void>;
-  onReplayTutorial: () => void;
+  onReplayTutorial?: () => void;
   onSignOut: () => Promise<void>;
   onDeleteAccount: () => Promise<void>;
 }
@@ -113,9 +113,11 @@ export function ProfileView({
             Ver assinatura
           </Button>
 
-          <Button variant="ghost" icon={<PlayCircle size={17} />} onClick={onReplayTutorial}>
-            Ver tutorial
-          </Button>
+          {onReplayTutorial && (
+            <Button variant="ghost" icon={<PlayCircle size={17} />} onClick={onReplayTutorial}>
+              Ver tutorial
+            </Button>
+          )}
         </div>
 
         <div className="profile-stats">
@@ -177,16 +179,18 @@ export function ProfileView({
             </button>
           </div>
 
-          <div className="setting-row setting-row--action">
-            <span><MousePointerClick size={20} /></span>
-            <div>
-              <strong>Tour guiado do app</strong>
-              <small>Veja novamente onde ficam flashcards, testes e mapas mentais</small>
+          {onReplayTutorial && (
+            <div className="setting-row setting-row--action">
+              <span><MousePointerClick size={20} /></span>
+              <div>
+                <strong>Tour guiado do app</strong>
+                <small>Veja novamente onde ficam flashcards, testes e mapas mentais</small>
+              </div>
+              <Button variant="secondary" onClick={onReplayTutorial}>
+                Reiniciar tour
+              </Button>
             </div>
-            <Button variant="secondary" onClick={onReplayTutorial}>
-              Reiniciar tour
-            </Button>
-          </div>
+          )}
         </section>
 
         <section className="settings-card">
