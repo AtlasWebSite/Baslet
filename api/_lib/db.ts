@@ -101,8 +101,6 @@ async function createSchema() {
       id text primary key,
       user_id text not null unique references profiles(id) on delete cascade,
       mercado_pago_preapproval_id text,
-      mercado_pago_preference_id text,
-      mercado_pago_payment_id text,
       mercado_pago_payer_id text,
       mercado_pago_checkout_url text,
       status text not null default 'inactive',
@@ -118,8 +116,6 @@ async function createSchema() {
   `;
 
   await sql`alter table subscriptions add column if not exists mercado_pago_preapproval_id text`;
-  await sql`alter table subscriptions add column if not exists mercado_pago_preference_id text`;
-  await sql`alter table subscriptions add column if not exists mercado_pago_payment_id text`;
   await sql`alter table subscriptions add column if not exists mercado_pago_payer_id text`;
   await sql`alter table subscriptions add column if not exists mercado_pago_checkout_url text`;
 
@@ -127,8 +123,6 @@ async function createSchema() {
   await sql`create index if not exists flashcards_user_set_idx on flashcards(user_id, study_set_id)`;
   await sql`create index if not exists mental_maps_user_idx on mental_maps(user_id)`;
   await sql`create index if not exists subscriptions_preapproval_idx on subscriptions(mercado_pago_preapproval_id)`;
-  await sql`create index if not exists subscriptions_preference_idx on subscriptions(mercado_pago_preference_id)`;
-  await sql`create index if not exists subscriptions_payment_idx on subscriptions(mercado_pago_payment_id)`;
 }
 
 export async function upsertProfileFromSession(user: SessionUser) {

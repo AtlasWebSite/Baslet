@@ -40,32 +40,6 @@ export interface MercadoPagoPreapproval {
   };
 }
 
-export interface MercadoPagoPreference {
-  id: string;
-  init_point?: string;
-  sandbox_init_point?: string;
-  external_reference?: string | number | null;
-}
-
-export interface MercadoPagoPayment {
-  id: string | number;
-  status?: string | null;
-  status_detail?: string | null;
-  external_reference?: string | number | null;
-  transaction_amount?: number | null;
-  currency_id?: string | null;
-  date_approved?: string | null;
-  date_created?: string | null;
-  payer?: {
-    id?: string | number | null;
-    email?: string | null;
-  } | null;
-  metadata?: {
-    user_id?: string;
-    [key: string]: unknown;
-  } | null;
-}
-
 function getAccessToken() {
   return requireEnvironment('MERCADO_PAGO_ACCESS_TOKEN');
 }
@@ -116,20 +90,20 @@ async function mercadoPagoRequest<T>(path: string, init?: RequestInit) {
 
   if (/payer and collector cannot be the same user/i.test(rawMessage)) {
     throw new MercadoPagoIntegrationError(
-      'Use uma conta compradora diferente da conta que recebe o dinheiro. Abra o checkout em janela anônima e entre com uma conta Mercado Pago diferente da vendedora.',
+      'Use uma conta compradora diferente da conta que recebe o dinheiro. Em testes, configure MERCADO_PAGO_TEST_PAYER_USER com o usuário TESTUSER comprador.',
       'same_payer_and_collector',
     );
   }
 
   if (/both payer and collector must be real or test users/i.test(rawMessage)) {
     throw new MercadoPagoIntegrationError(
-      'Você está misturando ambiente real com ambiente de teste. Para testar, use em MERCADO_PAGO_ACCESS_TOKEN o token TEST- da aba Testes > Credenciais de teste e gere um checkout novo.',
+      'Você está misturando os dois modos de teste do Mercado Pago. Se MERCADO_PAGO_ACCESS_TOKEN começa com TEST-, remova MERCADO_PAGO_TEST_PAYER_USER. Se quiser usar comprador TESTUSER, use um token APP_USR de uma aplicação criada na conta TESTUSER vendedora.',
     );
   }
 
   if (/internal server error/i.test(rawMessage)) {
     throw new MercadoPagoIntegrationError(
-      'O Mercado Pago não conseguiu criar o checkout. Confira o Access Token, gere um checkout novo e tente novamente em uma janela anônima.',
+      'O Mercado Pago não conseguiu criar o checkout de teste. Confira se MERCADO_PAGO_ACCESS_TOKEN veio da aba Testes > Credenciais de teste e se MERCADO_PAGO_TEST_PAYER_USER é um usuário TESTUSER comprador do mesmo país.',
     );
   }
 
@@ -178,19 +152,6 @@ export function mapMercadoPagoStatus(status?: string | null): AppSubscriptionSta
   return 'inactive';
 }
 
-export function mapMercadoPagoPaymentStatus(status?: string | null): AppSubscriptionStatus {
-  const normalized = String(status ?? '').toLowerCase();
-
-  if (normalized === 'approved') return 'active';
-  if (normalized === 'pending' || normalized === 'in_process' || normalized === 'in_mediation') return 'pending';
-  if (normalized === 'cancelled' || normalized === 'canceled' || normalized === 'refunded' || normalized === 'charged_back') {
-    return 'cancelled';
-  }
-  if (normalized === 'rejected') return 'rejected';
-
-  return 'inactive';
-}
-
 export function getSubscriptionUserIdFromReference(reference?: string | number | null) {
   if (typeof reference !== 'string') return undefined;
 
@@ -198,13 +159,6 @@ export function getSubscriptionUserIdFromReference(reference?: string | number |
   if (!reference.startsWith(prefix)) return undefined;
 
   return reference.slice(prefix.length) || undefined;
-}
-
-export function getSubscriptionUserIdFromPayment(payment: MercadoPagoPayment) {
-  const referencedUserId = getSubscriptionUserIdFromReference(payment.external_reference);
-  if (referencedUserId) return referencedUserId;
-
-  return typeof payment.metadata?.user_id === 'string' ? payment.metadata.user_id : undefined;
 }
 
 export function getMercadoPagoNextPaymentDate(preapproval: MercadoPagoPreapproval) {
@@ -217,14 +171,6 @@ export function getMercadoPagoCheckoutUrl(preapproval: MercadoPagoPreapproval) {
   }
 
   return preapproval.init_point ?? preapproval.sandbox_init_point ?? '';
-}
-
-export function getMercadoPagoPreferenceCheckoutUrl(preference: MercadoPagoPreference) {
-  if (isTestAccessToken()) {
-    return preference.sandbox_init_point ?? preference.init_point ?? '';
-  }
-
-  return preference.init_point ?? preference.sandbox_init_point ?? '';
 }
 
 export function getMercadoPagoPayerId(preapproval: MercadoPagoPreapproval) {
@@ -271,54 +217,8 @@ export async function createMercadoPagoSubscription(user: SessionUser, request: 
   return preapproval;
 }
 
-export async function createMercadoPagoPaymentPreference(user: SessionUser, request: VercelRequest) {
-  const appUrl = getAppUrl(request);
-  const notificationUrl = `${appUrl}/api/mercado-pago/webhook`;
-
-  const preference = await mercadoPagoRequest<MercadoPagoPreference>('/checkout/preferences', {
-    method: 'POST',
-    body: JSON.stringify({
-      items: [
-        {
-          id: 'studyflow-premium-monthly',
-          title: PLAN_NAME,
-          description: 'Acesso ao StudyFlow Premium por 30 dias.',
-          quantity: 1,
-          unit_price: PLAN_AMOUNT,
-          currency_id: PLAN_CURRENCY,
-        },
-      ],
-      external_reference: `studyflow:user:${user.id}`,
-      metadata: {
-        user_id: user.id,
-        plan_name: PLAN_NAME,
-      },
-      back_urls: {
-        success: `${appUrl}/billing/success`,
-        pending: `${appUrl}/billing/pending`,
-        failure: `${appUrl}/billing/failure`,
-      },
-      auto_return: 'approved',
-      notification_url: notificationUrl,
-      statement_descriptor: 'STUDYFLOW',
-    }),
-  });
-
-  const checkoutUrl = getMercadoPagoPreferenceCheckoutUrl(preference);
-  if (!preference.id || !checkoutUrl) {
-    console.error('Preferência sem link de checkout:', preference);
-    throw new Error('O Mercado Pago não retornou o link de pagamento.');
-  }
-
-  return preference;
-}
-
 export async function getMercadoPagoSubscription(preapprovalId: string) {
   return mercadoPagoRequest<MercadoPagoPreapproval>(`/preapproval/${encodeURIComponent(preapprovalId)}`);
-}
-
-export async function getMercadoPagoPayment(paymentId: string) {
-  return mercadoPagoRequest<MercadoPagoPayment>(`/v1/payments/${encodeURIComponent(paymentId)}`);
 }
 
 export async function cancelMercadoPagoSubscription(preapprovalId: string) {
@@ -346,7 +246,7 @@ export function extractMercadoPagoWebhookResourceId(request: VercelRequest, body
 
 export function isMercadoPagoWebhookSignatureValid(request: VercelRequest, resourceId: string) {
   const secret = process.env.MERCADO_PAGO_WEBHOOK_SECRET;
-  if (!secret) return true;
+  if (!secret) return process.env.NODE_ENV !== 'production';
 
   const signature = getHeaderValue(request, 'x-signature');
   const requestId = getHeaderValue(request, 'x-request-id');

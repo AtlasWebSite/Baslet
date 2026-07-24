@@ -5,26 +5,11 @@ import { PricingCard } from './PricingCard';
 import { Button } from '../ui/Button';
 
 const messages = {
-  pending: {
-    title: 'Pagamento em análise',
-    text: 'O Mercado Pago ainda está processando seu pagamento. O acesso será liberado automaticamente após a confirmação.',
-  },
-  rejected: {
-    title: 'Pagamento não aprovado',
-    text: 'A cobrança não foi aprovada. Você pode iniciar uma nova tentativa com segurança.',
-  },
-  paused: {
-    title: 'Acesso pausado',
-    text: 'Seu acesso Premium está pausado. Reative o plano para continuar estudando.',
-  },
-  cancelled: {
-    title: 'Acesso encerrado',
-    text: 'Seu acesso Premium não está mais ativo. Você pode pagar novamente quando quiser.',
-  },
-  inactive: {
-    title: 'Desbloqueie seus estudos',
-    text: 'Use flashcards, mapas mentais, testes e progresso por apenas R$ 11,90 por mês.',
-  },
+  pending: { title: 'Pagamento em análise', text: 'O Mercado Pago ainda está processando sua assinatura. O acesso será liberado automaticamente após a confirmação.' },
+  rejected: { title: 'Pagamento não aprovado', text: 'A cobrança não foi aprovada. Você pode iniciar uma nova tentativa com segurança.' },
+  paused: { title: 'Assinatura pausada', text: 'Seu acesso Premium está pausado. Reative o plano para continuar estudando.' },
+  cancelled: { title: 'Assinatura cancelada', text: 'Sua assinatura não está mais ativa. Você pode assinar novamente quando quiser.' },
+  inactive: { title: 'Desbloqueie seus estudos', text: 'Use flashcards, mapas mentais, testes e progresso por apenas R$ 11,90 por mês.' },
 };
 
 interface SubscriptionPaywallProps {
