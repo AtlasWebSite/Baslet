@@ -181,7 +181,7 @@ function AuthenticatedApp({ user }: { user: NonNullable<ReturnType<typeof useAut
       if (!billing.isPremium) return paywall;
       return <div className="view billing-view"><SubscriptionStatusCard subscription={billing.subscription} refreshing={billing.isRefreshing} cancelling={billing.isCancelling} onRefresh={() => void billing.refresh()} onCancel={() => void cancelPlan()} onSubscribe={() => void billing.startSubscription()}/></div>;
     }
-    if (visibleView === 'profile') return <ProfileView profile={profile} studySets={studySets} isPremium={billing.isPremium} onBilling={() => navigate('billing')} onClear={clear} onReplayTutorial={GUIDED_TOUR_ENABLED ? replayGuidedTour : undefined} onSignOut={logout} onDeleteAccount={deleteAccount}/>;
+    if (visibleView === 'profile') return <ProfileView profile={profile} studySets={studySets} isPremium={billing.isPremium} onBilling={() => navigate('billing')} onClear={clear} onReplayTutorial={() => setReplayTutorial(true)} onReplayGuidedTour={GUIDED_TOUR_ENABLED ? replayGuidedTour : undefined} onSignOut={logout} onDeleteAccount={deleteAccount}/>;
     return premiumContent();
   };
 
