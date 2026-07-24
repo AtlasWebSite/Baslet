@@ -95,6 +95,12 @@ async function mercadoPagoRequest<T>(path: string, init?: RequestInit) {
     );
   }
 
+  if (/internal server error/i.test(rawMessage)) {
+    throw new MercadoPagoIntegrationError(
+      'O Mercado Pago não conseguiu criar o checkout de teste. Confira se a conta compradora de teste é do mesmo país da vendedora e se MERCADO_PAGO_TEST_PAYER_USER está com o usuário TESTUSER correto.',
+    );
+  }
+
   throw new MercadoPagoIntegrationError(rawMessage);
 }
 
@@ -103,9 +109,14 @@ function isTestAccessToken() {
 }
 
 function normalizeTestPayerEmail(value: string) {
-  const normalized = value.trim();
+  const normalized = value.trim().replace(/\s+/g, '');
   if (!normalized) return '';
   if (normalized.includes('@')) return normalized;
+
+  const testUserMatch = normalized.match(/^TESTUSER(\d+)$/i);
+  if (testUserMatch) {
+    return `test_user_${testUserMatch[1]}@testuser.com`;
+  }
 
   return `${normalized}@testuser.com`;
 }
