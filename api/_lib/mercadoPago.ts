@@ -97,7 +97,7 @@ async function mercadoPagoRequest<T>(path: string, init?: RequestInit) {
 
   if (/both payer and collector must be real or test users/i.test(rawMessage)) {
     throw new MercadoPagoIntegrationError(
-      'Você está misturando conta real com conta teste. Na Vercel, use em MERCADO_PAGO_ACCESS_TOKEN o Access Token da aba Testes > Credenciais de teste do Mercado Pago. Em MERCADO_PAGO_TEST_PAYER_USER, use o usuário TESTUSER comprador.',
+      'Você está misturando os dois modos de teste do Mercado Pago. Se MERCADO_PAGO_ACCESS_TOKEN começa com TEST-, remova MERCADO_PAGO_TEST_PAYER_USER. Se quiser usar comprador TESTUSER, use um token APP_USR de uma aplicação criada na conta TESTUSER vendedora.',
     );
   }
 
@@ -133,6 +133,7 @@ function normalizeTestPayerEmail(value: string) {
 
 function getPayerEmail(user: SessionUser) {
   const testPayer = getConfiguredTestPayer();
+  if (isTestAccessToken()) return user.email;
   if (testPayer) return normalizeTestPayerEmail(testPayer);
 
   return user.email;

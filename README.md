@@ -72,7 +72,12 @@ O pagamento usa Mercado Pago pelo backend da Vercel. O frontend nunca recebe o A
 
 Em credenciais de teste, use `MERCADO_PAGO_TEST_PAYER_EMAIL` com um comprador de teste diferente da conta vendedora/collector. O Mercado Pago não permite que pagador e recebedor sejam o mesmo usuário.
 
-Para testar assinaturas, use em `MERCADO_PAGO_ACCESS_TOKEN` o Access Token da aba `Testes > Credenciais de teste` da sua aplicaÃ§Ã£o no Mercado Pago. O comprador deve ser uma conta de teste. Se o Mercado Pago mostrar apenas o usuÃ¡rio comprador no formato `TESTUSER...`, configure `MERCADO_PAGO_TEST_PAYER_USER=TESTUSER...`; o backend converte automaticamente para `test_user_...@testuser.com`, formato aceito pela API de assinaturas em testes.
+Existem dois modos de teste no Mercado Pago:
+
+1. Sandbox simples: use em `MERCADO_PAGO_ACCESS_TOKEN` o token que comeÃ§a com `TEST-` da aba `Testes > Credenciais de teste`. Nesse modo, deixe `MERCADO_PAGO_TEST_PAYER_USER` vazio.
+2. Teste com contas `TESTUSER`: entre no Mercado Pago com uma conta `TESTUSER` vendedora, crie uma aplicaÃ§Ã£o nessa conta e use o token `APP_USR...` dessa aplicaÃ§Ã£o. Depois configure `MERCADO_PAGO_TEST_PAYER_USER=TESTUSER...` com uma conta `TESTUSER` compradora diferente.
+
+NÃ£o misture token `TEST-` com comprador `TESTUSER`, porque o Mercado Pago pode entender que uma parte Ã© real e a outra Ã© teste. Se o Mercado Pago mostrar apenas o usuÃ¡rio comprador no formato `TESTUSER...`, o backend converte automaticamente para `test_user_...@testuser.com`.
 
 Configure o webhook no Mercado Pago:
 
