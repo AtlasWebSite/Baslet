@@ -90,8 +90,14 @@ async function mercadoPagoRequest<T>(path: string, init?: RequestInit) {
 
   if (/payer and collector cannot be the same user/i.test(rawMessage)) {
     throw new MercadoPagoIntegrationError(
-      'Use uma conta compradora diferente da conta Mercado Pago que recebe o dinheiro. Em testes, configure MERCADO_PAGO_TEST_PAYER_EMAIL com o e-mail de um comprador de teste.',
+      'Use uma conta compradora diferente da conta Mercado Pago que recebe o dinheiro. Em testes, configure MERCADO_PAGO_TEST_PAYER_USER com o usuário TESTUSER comprador.',
       'same_payer_and_collector',
+    );
+  }
+
+  if (/both payer and collector must be real or test users/i.test(rawMessage)) {
+    throw new MercadoPagoIntegrationError(
+      'O pagador e o recebedor precisam ser ambos reais ou ambos de teste. Para testar assinatura, use o Access Token APP_USR da conta TESTUSER vendedora e configure MERCADO_PAGO_TEST_PAYER_USER com uma conta TESTUSER compradora diferente.',
     );
   }
 
@@ -108,6 +114,10 @@ function isTestAccessToken() {
   return getAccessToken().startsWith('TEST-');
 }
 
+function getConfiguredTestPayer() {
+  return process.env.MERCADO_PAGO_TEST_PAYER_EMAIL || process.env.MERCADO_PAGO_TEST_PAYER_USER || '';
+}
+
 function normalizeTestPayerEmail(value: string) {
   const normalized = value.trim().replace(/\s+/g, '');
   if (!normalized) return '';
@@ -122,8 +132,8 @@ function normalizeTestPayerEmail(value: string) {
 }
 
 function getPayerEmail(user: SessionUser) {
-  const testPayer = process.env.MERCADO_PAGO_TEST_PAYER_EMAIL || process.env.MERCADO_PAGO_TEST_PAYER_USER;
-  if (isTestAccessToken() && testPayer) return normalizeTestPayerEmail(testPayer);
+  const testPayer = getConfiguredTestPayer();
+  if (testPayer) return normalizeTestPayerEmail(testPayer);
 
   return user.email;
 }
