@@ -224,6 +224,17 @@ export async function deleteStudyData(user: SessionUser) {
   await sql`delete from study_sets where user_id = ${user.id}`;
 }
 
+export async function deleteUserAccount(user: SessionUser) {
+  await ensureSchema();
+  await sql`delete from study_progress where user_id = ${user.id}`;
+  await sql`delete from quiz_results where user_id = ${user.id}`;
+  await sql`delete from mental_maps where user_id = ${user.id}`;
+  await sql`delete from flashcards where user_id = ${user.id}`;
+  await sql`delete from study_sets where user_id = ${user.id}`;
+  await sql`delete from subscriptions where user_id = ${user.id}`;
+  await sql`delete from profiles where id = ${user.id}`;
+}
+
 export async function saveProgress(user: SessionUser, payload: Record<string, unknown>) {
   await ensureSchema();
 

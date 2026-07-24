@@ -8,6 +8,7 @@ import {
   createStudySetForUser,
   deleteMentalMapForUser,
   deleteStudyData,
+  deleteUserAccount,
   getMentalMap,
   getMentalMaps,
   getProfile,
@@ -510,6 +511,34 @@ async function handleMercadoPagoWebhook(request: VercelRequest, response: Vercel
   }
 }
 
+async function handleAccount(request: VercelRequest, response: VercelResponse) {
+  if (getMethod(request) !== 'DELETE') {
+    methodNotAllowed(response);
+    return;
+  }
+
+  try {
+    const user = await requireSessionUser(request);
+    const subscription = await getSubscription(user);
+
+    if (subscription?.mercadoPagoPreapprovalId && process.env.MERCADO_PAGO_ACCESS_TOKEN) {
+      await cancelMercadoPagoSubscription(subscription.mercadoPagoPreapprovalId);
+    }
+
+    await deleteUserAccount(user);
+    clearSessionCookie(response);
+    json(response, 200, { ok: true });
+  } catch (error) {
+    if (error instanceof Error && error.message === 'AUTH_REQUIRED') {
+      unauthorized(response, 'Entre novamente para apagar sua conta.');
+      return;
+    }
+
+    console.error('Erro ao apagar conta:', error);
+    json(response, 400, { error: 'Não foi possível apagar sua conta agora. Tente novamente em alguns instantes.' });
+  }
+}
+
 async function handleMentalMaps(request: VercelRequest, response: VercelResponse) {
   try {
     const user = await requireSessionUser(request);
@@ -575,6 +604,8 @@ export default async function handler(request: VercelRequest, response: VercelRe
   if (resource === 'auth' && action === 'callback') return handleGoogleCallback(request, response);
   if (resource === 'auth' && action === 'logout') return handleAuthLogout(request, response);
   if (resource === 'auth' && action === 'session') return handleAuthSession(request, response);
+
+  if (resource === 'account' && !action) return handleAccount(request, response);
 
   if (resource === 'profile' && !action) return handleProfile(request, response);
   if (resource === 'profile' && action === 'onboarding') return handleProfileOnboarding(request, response);

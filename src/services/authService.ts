@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from '../lib/apiClient';
+import { apiDelete, apiGet, apiPost } from '../lib/apiClient';
 import type { AppSession } from '../types/auth';
 
 export async function signInWithGoogle(redirectPath = '/') {
@@ -11,6 +11,11 @@ export async function signInWithGoogle(redirectPath = '/') {
 
 export async function signOut() {
   await apiPost<{ ok: true }>('/api/auth/logout');
+  window.location.replace('/');
+}
+
+export async function deleteAccount() {
+  await apiDelete<{ ok: true }>('/api/account');
   window.location.replace('/');
 }
 

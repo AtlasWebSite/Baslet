@@ -19,7 +19,7 @@ import { useAuth } from './hooks/useAuth';
 import { useProfile } from './hooks/useProfile';
 import { useStudySets } from './hooks/useStudySets';
 import { useSubscription } from './hooks/useSubscription';
-import { signOut } from './services/authService';
+import { deleteAccount as deleteAccountService, signOut } from './services/authService';
 import { saveCardProgress } from './services/progressService';
 import type { StudySet, ToastMessage, ViewId } from './types';
 import type { PaymentReturnStatus } from './types/subscription';
@@ -140,6 +140,7 @@ function AuthenticatedApp({ user }: { user: NonNullable<ReturnType<typeof useAut
   const rateCard = async (set: StudySet, cardId: string, mastery: 1|2|3) => { if (!billing.isPremium) { requirePremium('Assine para salvar seu progresso nos flashcards.'); throw new Error('Premium necessário.'); } await saveCardProgress(user.id, set, cardId, mastery); notify('success', 'Progresso sincronizado.'); };
   const clear = async () => { if (!billing.isPremium) { requirePremium('Assine para gerenciar seus dados de estudo.'); return; } if (!window.confirm('Excluir todos os seus conjuntos, flashcards e progresso? Esta ação não pode ser desfeita.')) return; await clearStudySets(); notify('info', 'Seus dados de estudo foram removidos.'); };
   const logout = async () => { clearSensitiveState(); await signOut(); };
+  const deleteAccount = async () => { clearSensitiveState(); await deleteAccountService(); };
   const finishTutorial = async () => { if (!profile.onboarding_completed) await finishOnboarding(); setActiveView(INITIAL_VIEW); setReplayTutorial(false); };
   const cancelPlan = async () => { if (!window.confirm('Cancelar a renovação do StudyFlow Premium? Você continua com acesso até o fim do período pago.')) return; await billing.cancel(); notify('info', 'Renovação cancelada. Seu acesso continua até o fim do período pago.'); };
   const importLegacy = async () => { if (!legacySets) return; if (!billing.isPremium) { requirePremium('Assine para importar estudos antigos para sua conta.'); return; } setImporting(true); try { const existingTitles = new Set(studySets.map((set) => set.title.trim().toLowerCase())); const unique = legacySets.filter((set) => !existingTitles.has(set.title.trim().toLowerCase())); for (const set of unique) await addStudySet({ title: set.title, subject: set.subject, description: set.description, color: set.color || '#6758e8', icon: set.icon || 'general', cards: set.cards.map((card) => ({ ...card, mastery: 0 })) }); localStorage.removeItem(LEGACY_KEY); setLegacySets(undefined); notify('success', `${unique.length} conjunto(s) importado(s).`); } catch (reason) { notify('error', reason instanceof Error ? reason.message : 'Falha ao importar.'); } finally { setImporting(false); } };
@@ -159,7 +160,7 @@ function AuthenticatedApp({ user }: { user: NonNullable<ReturnType<typeof useAut
       if (!billing.isPremium) return paywall;
       return <div className="view billing-view"><SubscriptionStatusCard subscription={billing.subscription} refreshing={billing.isRefreshing} cancelling={billing.isCancelling} onRefresh={() => void billing.refresh()} onCancel={() => void cancelPlan()} onSubscribe={() => void billing.startSubscription()}/></div>;
     }
-    if (visibleView === 'profile') return <ProfileView profile={profile} studySets={studySets} isPremium={billing.isPremium} onBilling={() => navigate('billing')} onClear={clear} onReplayTutorial={() => setReplayTutorial(true)} onSignOut={logout}/>;
+    if (visibleView === 'profile') return <ProfileView profile={profile} studySets={studySets} isPremium={billing.isPremium} onBilling={() => navigate('billing')} onClear={clear} onReplayTutorial={() => setReplayTutorial(true)} onSignOut={logout} onDeleteAccount={deleteAccount}/>;
     return premiumContent();
   };
 
