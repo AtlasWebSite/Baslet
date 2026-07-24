@@ -44,6 +44,10 @@ function getAccessToken() {
   return requireEnvironment('MERCADO_PAGO_ACCESS_TOKEN');
 }
 
+function isTestAccessToken() {
+  return getAccessToken().startsWith('TEST-');
+}
+
 function getHeaderValue(request: VercelRequest, name: string) {
   const value = request.headers[name.toLowerCase()];
   if (Array.isArray(value)) return value[0] ?? '';
@@ -72,6 +76,36 @@ function safeCompareHex(left: string, right: string) {
   }
 }
 
+function getConfiguredTestPayer() {
+  return process.env.MERCADO_PAGO_TEST_PAYER_EMAIL || process.env.MERCADO_PAGO_TEST_PAYER_USER || '';
+}
+
+function normalizeTestPayerEmail(value: string) {
+  const normalized = value.trim().replace(/\s+/g, '');
+  if (!normalized) return '';
+  if (normalized.includes('@')) return normalized;
+
+  const testUserMatch = normalized.match(/^TESTUSER(\d+)$/i);
+  if (testUserMatch) {
+    return `test_user_${testUserMatch[1]}@testuser.com`;
+  }
+
+  return `${normalized}@testuser.com`;
+}
+
+function getPayerEmail(user: SessionUser) {
+  const testPayer = getConfiguredTestPayer();
+  if (testPayer) return normalizeTestPayerEmail(testPayer);
+
+  if (isTestAccessToken()) {
+    throw new MercadoPagoIntegrationError(
+      'Para testar assinaturas, configure MERCADO_PAGO_TEST_PAYER_USER com o usuário TESTUSER comprador do Mercado Pago.',
+    );
+  }
+
+  return user.email;
+}
+
 async function mercadoPagoRequest<T>(path: string, init?: RequestInit) {
   const response = await fetch(`${MERCADO_PAGO_API_URL}${path}`, {
     ...init,
@@ -97,46 +131,17 @@ async function mercadoPagoRequest<T>(path: string, init?: RequestInit) {
 
   if (/both payer and collector must be real or test users/i.test(rawMessage)) {
     throw new MercadoPagoIntegrationError(
-      'Você está misturando os dois modos de teste do Mercado Pago. Se MERCADO_PAGO_ACCESS_TOKEN começa com TEST-, remova MERCADO_PAGO_TEST_PAYER_USER. Se quiser usar comprador TESTUSER, use um token APP_USR de uma aplicação criada na conta TESTUSER vendedora.',
+      'Você está misturando ambiente real com ambiente de teste. Para testar assinaturas, use Access Token TEST- junto com MERCADO_PAGO_TEST_PAYER_USER de uma conta TESTUSER compradora.',
     );
   }
 
   if (/internal server error/i.test(rawMessage)) {
     throw new MercadoPagoIntegrationError(
-      'O Mercado Pago não conseguiu criar o checkout de teste. Confira se MERCADO_PAGO_ACCESS_TOKEN veio da aba Testes > Credenciais de teste e se MERCADO_PAGO_TEST_PAYER_USER é um usuário TESTUSER comprador do mesmo país.',
+      'O Mercado Pago não conseguiu criar a assinatura. Confira se o Access Token e o pagador pertencem ao mesmo ambiente de teste ou produção.',
     );
   }
 
   throw new MercadoPagoIntegrationError(rawMessage);
-}
-
-function isTestAccessToken() {
-  return getAccessToken().startsWith('TEST-');
-}
-
-function getConfiguredTestPayer() {
-  return process.env.MERCADO_PAGO_TEST_PAYER_EMAIL || process.env.MERCADO_PAGO_TEST_PAYER_USER || '';
-}
-
-function normalizeTestPayerEmail(value: string) {
-  const normalized = value.trim().replace(/\s+/g, '');
-  if (!normalized) return '';
-  if (normalized.includes('@')) return normalized;
-
-  const testUserMatch = normalized.match(/^TESTUSER(\d+)$/i);
-  if (testUserMatch) {
-    return `test_user_${testUserMatch[1]}@testuser.com`;
-  }
-
-  return `${normalized}@testuser.com`;
-}
-
-function getPayerEmail(user: SessionUser) {
-  const testPayer = getConfiguredTestPayer();
-  if (isTestAccessToken()) return user.email;
-  if (testPayer) return normalizeTestPayerEmail(testPayer);
-
-  return user.email;
 }
 
 export function mapMercadoPagoStatus(status?: string | null): AppSubscriptionStatus {
@@ -211,7 +216,7 @@ export async function createMercadoPagoSubscription(user: SessionUser, request: 
   const checkoutUrl = getMercadoPagoCheckoutUrl(preapproval);
   if (!preapproval.id || !checkoutUrl) {
     console.error('Assinatura sem link de checkout:', preapproval);
-    throw new Error('O Mercado Pago não retornou o link de pagamento.');
+    throw new Error('O Mercado Pago não retornou o link de pagamento da assinatura.');
   }
 
   return preapproval;
@@ -240,6 +245,13 @@ export function extractMercadoPagoWebhookResourceId(request: VercelRequest, body
   const data = body.data;
   if (data && typeof data === 'object' && 'id' in data) return String((data as { id?: unknown }).id ?? '');
   if ('id' in body) return String(body.id ?? '');
+
+  return '';
+}
+
+export function getMercadoPagoWebhookTopic(body: Record<string, unknown>) {
+  if (typeof body.type === 'string') return body.type;
+  if (typeof body.topic === 'string') return body.topic;
 
   return '';
 }

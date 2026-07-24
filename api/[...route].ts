@@ -28,6 +28,7 @@ import {
   extractMercadoPagoWebhookResourceId,
   getMercadoPagoCheckoutUrl,
   getMercadoPagoSubscription,
+  getMercadoPagoWebhookTopic,
   isMercadoPagoWebhookSignatureValid,
 } from './_lib/mercadoPago.js';
 import {
@@ -484,6 +485,12 @@ async function handleMercadoPagoWebhook(request: VercelRequest, response: Vercel
     const resourceId = extractMercadoPagoWebhookResourceId(request, body);
 
     if (!resourceId) {
+      json(response, 200, { ok: true, ignored: true });
+      return;
+    }
+
+    const topic = getMercadoPagoWebhookTopic(body);
+    if (topic && topic !== 'subscription_preapproval') {
       json(response, 200, { ok: true, ignored: true });
       return;
     }

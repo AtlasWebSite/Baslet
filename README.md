@@ -2,10 +2,10 @@
 
 Aplicativo de estudos com login Google, dados privados por usuário e backend preparado para Vercel Serverless + Vercel Postgres/Neon.
 
-## O que mudou
+## Visão geral
 
-- O frontend não usa mais Supabase.
-- O login Google agora passa por rotas `/api/auth/*` na Vercel.
+- O frontend não usa Supabase.
+- O login Google passa por rotas `/api/auth/*` na Vercel.
 - A sessão é salva em cookie HttpOnly.
 - Flashcards, progresso, mapas mentais, perfil e assinatura usam rotas `/api`.
 - O banco esperado é Postgres conectado à Vercel, normalmente Neon/Vercel Postgres.
@@ -20,10 +20,10 @@ GOOGLE_CLIENT_SECRET=seu-client-secret-google
 AUTH_SECRET=uma-string-grande-aleatoria
 APP_URL=http://localhost:3000
 POSTGRES_URL=postgres://usuario:senha@host/database
-MERCADO_PAGO_ACCESS_TOKEN=TEST-ou-APP_USR-token-de-teste
+MERCADO_PAGO_ACCESS_TOKEN=TEST-ou-APP_USR-token
 MERCADO_PAGO_WEBHOOK_SECRET=segredo-do-webhook
-MERCADO_PAGO_TEST_PAYER_EMAIL=email-comprador-de-teste
 MERCADO_PAGO_TEST_PAYER_USER=TESTUSER-comprador-de-teste
+MERCADO_PAGO_TEST_PAYER_EMAIL=
 ```
 
 Na produção, `APP_URL` deve ser o domínio final:
@@ -66,20 +66,36 @@ Se quiser apenas testar o frontend sem backend, `npm run dev` ainda sobe o Vite,
 npm run build
 ```
 
-## Assinatura
+## Assinatura Mercado Pago
 
-O pagamento usa Mercado Pago pelo backend da Vercel. O frontend nunca recebe o Access Token.
+O pagamento usa Mercado Pago Assinaturas pelo endpoint `/preapproval`. O frontend nunca recebe o Access Token.
 
-Em credenciais de teste, use `MERCADO_PAGO_TEST_PAYER_EMAIL` com um comprador de teste diferente da conta vendedora/collector. O Mercado Pago não permite que pagador e recebedor sejam o mesmo usuário.
+O fluxo atual:
 
-Existem dois modos de teste no Mercado Pago:
+1. O usuário logado clica em assinar.
+2. O backend cria uma assinatura mensal de R$ 11,90 com status `pending`.
+3. O usuário abre o link de assinatura do Mercado Pago.
+4. Após a confirmação, o webhook `subscription_preapproval` ou a sincronização da assinatura atualiza o status para `active`.
+5. O StudyFlow libera o Premium apenas quando a assinatura real estiver ativa.
 
-1. Sandbox simples: use em `MERCADO_PAGO_ACCESS_TOKEN` o token que comeÃ§a com `TEST-` da aba `Testes > Credenciais de teste`. Nesse modo, deixe `MERCADO_PAGO_TEST_PAYER_USER` vazio.
-2. Teste com contas `TESTUSER`: entre no Mercado Pago com uma conta `TESTUSER` vendedora, crie uma aplicaÃ§Ã£o nessa conta e use o token `APP_USR...` dessa aplicaÃ§Ã£o. Depois configure `MERCADO_PAGO_TEST_PAYER_USER=TESTUSER...` com uma conta `TESTUSER` compradora diferente.
+Para testar:
 
-NÃ£o misture token `TEST-` com comprador `TESTUSER`, porque o Mercado Pago pode entender que uma parte Ã© real e a outra Ã© teste. Se o Mercado Pago mostrar apenas o usuÃ¡rio comprador no formato `TESTUSER...`, o backend converte automaticamente para `test_user_...@testuser.com`.
+```env
+MERCADO_PAGO_ACCESS_TOKEN=TEST-seu-token-da-aba-testes
+MERCADO_PAGO_TEST_PAYER_USER=TESTUSER-da-conta-compradora
+```
 
-Configure o webhook no Mercado Pago:
+Se o Mercado Pago mostrar o usuário comprador no formato `TESTUSER...`, coloque esse valor diretamente em `MERCADO_PAGO_TEST_PAYER_USER`. O backend converte para o formato aceito pela API de assinaturas.
+
+Para produção:
+
+```env
+MERCADO_PAGO_ACCESS_TOKEN=APP_USR-seu-token-real
+MERCADO_PAGO_TEST_PAYER_USER=
+MERCADO_PAGO_TEST_PAYER_EMAIL=
+```
+
+Configure o webhook no Mercado Pago para o tópico `subscription_preapproval`:
 
 ```text
 https://app-usestudyflow.vercel.app/api/mercado-pago/webhook
@@ -94,6 +110,7 @@ https://app-usestudyflow.vercel.app/pagamento
 ## Segurança
 
 - O token secreto do Google fica apenas no backend.
+- O Access Token do Mercado Pago fica apenas no backend.
 - A sessão usa cookie HttpOnly.
 - Todas as consultas filtram pelo usuário autenticado no backend.
 - O frontend não escolhe `user_id` para acessar dados de outro usuário.
