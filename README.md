@@ -23,6 +23,7 @@ POSTGRES_URL=postgres://usuario:senha@host/database
 MERCADO_PAGO_ACCESS_TOKEN=TEST-ou-APP_USR-token-de-teste
 MERCADO_PAGO_WEBHOOK_SECRET=segredo-do-webhook
 MERCADO_PAGO_TEST_PAYER_EMAIL=email-comprador-de-teste
+MERCADO_PAGO_TEST_PAYER_USER=TESTUSER-comprador-de-teste
 ```
 
 Na produção, `APP_URL` deve ser o domínio final:
@@ -70,6 +71,8 @@ npm run build
 O pagamento usa Mercado Pago pelo backend da Vercel. O frontend nunca recebe o Access Token.
 
 Em credenciais de teste, use `MERCADO_PAGO_TEST_PAYER_EMAIL` com um comprador de teste diferente da conta vendedora/collector. O Mercado Pago não permite que pagador e recebedor sejam o mesmo usuário.
+
+Se o Mercado Pago mostrar apenas o usuÃ¡rio no formato `TESTUSER...`, configure `MERCADO_PAGO_TEST_PAYER_USER=TESTUSER...`; o backend converte automaticamente para o formato aceito pela API de assinaturas.
 
 Configure o webhook no Mercado Pago:
 

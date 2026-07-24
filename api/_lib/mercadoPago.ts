@@ -102,9 +102,17 @@ function isTestAccessToken() {
   return getAccessToken().startsWith('TEST-');
 }
 
+function normalizeTestPayerEmail(value: string) {
+  const normalized = value.trim();
+  if (!normalized) return '';
+  if (normalized.includes('@')) return normalized;
+
+  return `${normalized}@testuser.com`;
+}
+
 function getPayerEmail(user: SessionUser) {
-  const testPayerEmail = process.env.MERCADO_PAGO_TEST_PAYER_EMAIL?.trim();
-  if (isTestAccessToken() && testPayerEmail) return testPayerEmail;
+  const testPayer = process.env.MERCADO_PAGO_TEST_PAYER_EMAIL || process.env.MERCADO_PAGO_TEST_PAYER_USER;
+  if (isTestAccessToken() && testPayer) return normalizeTestPayerEmail(testPayer);
 
   return user.email;
 }
