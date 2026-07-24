@@ -78,6 +78,12 @@ O fluxo atual:
 4. Após a confirmação, o webhook `subscription_preapproval` ou a sincronização da assinatura atualiza o status para `active`.
 5. O StudyFlow libera o Premium apenas quando a assinatura real estiver ativa.
 
+## Pix em assinaturas
+
+O StudyFlow cria a assinatura pelo endpoint `/preapproval`. O Pix aparece no checkout hospedado do Mercado Pago quando a conta vendedora tem Pix habilitado/chave Pix cadastrada e o método está disponível para assinaturas.
+
+Não existe chave secreta de Pix no frontend e o app não força método de pagamento no payload. A escolha do método acontece dentro do checkout seguro do Mercado Pago.
+
 Para testar:
 
 ```env
