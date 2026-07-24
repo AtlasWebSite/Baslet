@@ -328,7 +328,6 @@ export function GuidedTour({ active, onNavigate, onComplete, onSkip }: GuidedTou
           role="dialog"
           aria-modal="false"
           aria-labelledby="guided-tour-title"
-          onClickCapture={(event) => event.stopPropagation()}
         >
           <header>
             <span><Icon size={19} /></span>
