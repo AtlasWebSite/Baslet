@@ -108,6 +108,11 @@ function AuthenticatedApp({ user }: { user: NonNullable<ReturnType<typeof useAut
   useEffect(() => { try { const raw = localStorage.getItem(LEGACY_KEY); if (!raw) return; const parsed: unknown = JSON.parse(raw); if (Array.isArray(parsed) && parsed.length) setLegacySets(parsed as StudySet[]); } catch { localStorage.removeItem(LEGACY_KEY); } }, []);
   useEffect(() => { if (billing.isPremium) setPremiumOpen(false); }, [billing.isPremium]);
   useEffect(() => {
+    const openPremiumModal = () => setPremiumOpen(true);
+    window.addEventListener('studyflow:open-premium', openPremiumModal);
+    return () => window.removeEventListener('studyflow:open-premium', openPremiumModal);
+  }, []);
+  useEffect(() => {
     if (!GUIDED_TOUR_ENABLED) return;
     if (!profile || profileLoading || setsLoading || replayTutorial || walkthroughDismissed) return;
     if (profile.walkthrough_completed || !profile.onboarding_completed || !starterSetsCreated || !studySets.length) return;
@@ -168,6 +173,7 @@ function AuthenticatedApp({ user }: { user: NonNullable<ReturnType<typeof useAut
 
   const paywall = <SubscriptionPaywall subscription={billing.subscription} isStarting={billing.isStarting} isRefreshing={billing.isRefreshing} errorMessage={billing.errorMessage} onSubscribe={() => void billing.startSubscription()} onRefresh={() => void billing.refresh()} onSignOut={() => void logout()}/>;
   const premiumWindow = <SubscriptionPaywall subscription={billing.subscription} isStarting={billing.isStarting} isRefreshing={billing.isRefreshing} errorMessage={billing.errorMessage} onSubscribe={() => void billing.startSubscription()} onRefresh={() => void billing.refresh()} onSignOut={() => void logout()} showSignOut={false}/>;
+  const openBilling = () => { if (billing.isPremium) { navigate('billing'); return; } setPremiumOpen(true); };
   const premiumContent = () => {
     if (visibleView === 'home') return <>{starterWarning && <div className="starter-warning" role="status"><AlertTriangle size={17}/><span>{starterWarning}</span></div>}<HomeView studySets={filteredSets} isPremium={tourPremiumAccess} onStudy={study} onNavigate={navigate} onCreate={openCreate}/></>;
     if (visibleView === 'studies') return <StudiesView studySets={filteredSets} isPremium={tourPremiumAccess} onStudy={study} onCreate={openCreate}/>;
@@ -181,7 +187,7 @@ function AuthenticatedApp({ user }: { user: NonNullable<ReturnType<typeof useAut
       if (!billing.isPremium) return paywall;
       return <div className="view billing-view"><SubscriptionStatusCard subscription={billing.subscription} refreshing={billing.isRefreshing} cancelling={billing.isCancelling} onRefresh={() => void billing.refresh()} onCancel={() => void cancelPlan()} onSubscribe={() => void billing.startSubscription()}/></div>;
     }
-    if (visibleView === 'profile') return <ProfileView profile={profile} studySets={studySets} isPremium={billing.isPremium} onBilling={() => navigate('billing')} onClear={clear} onReplayTutorial={() => setReplayTutorial(true)} onReplayGuidedTour={GUIDED_TOUR_ENABLED ? replayGuidedTour : undefined} onSignOut={logout} onDeleteAccount={deleteAccount}/>;
+    if (visibleView === 'profile') return <ProfileView profile={profile} studySets={studySets} isPremium={billing.isPremium} onBilling={openBilling} onClear={clear} onReplayTutorial={() => setReplayTutorial(true)} onReplayGuidedTour={GUIDED_TOUR_ENABLED ? replayGuidedTour : undefined} onSignOut={logout} onDeleteAccount={deleteAccount}/>;
     return premiumContent();
   };
 

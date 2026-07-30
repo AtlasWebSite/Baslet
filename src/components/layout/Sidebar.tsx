@@ -19,6 +19,7 @@ const subscriptionStatusLabels: Record<SubscriptionStatus | 'inactive', string> 
 interface SidebarProps {
   activeView: ViewId;
   onNavigate: (view: ViewId) => void;
+  onBilling?: () => void;
   profile: Profile;
   subscription: Subscription | null;
   isPremium: boolean;
@@ -44,7 +45,7 @@ function getCurrentPlan(subscription: Subscription | null, isPremium: boolean) {
   return 'Gratuito';
 }
 
-export function Sidebar({ activeView, onNavigate, profile, subscription, isPremium }: SidebarProps) {
+export function Sidebar({ activeView, onNavigate, onBilling, profile, subscription, isPremium }: SidebarProps) {
   const [profileOpen, setProfileOpen] = useState(false);
   const subscriptionStatus = subscription?.status ?? 'inactive';
   const name = profile.full_name;
@@ -53,6 +54,21 @@ export function Sidebar({ activeView, onNavigate, profile, subscription, isPremi
   const navigateFromModal = (view: ViewId) => {
     setProfileOpen(false);
     onNavigate(view);
+  };
+
+  const openBillingFromModal = () => {
+    setProfileOpen(false);
+    if (onBilling) {
+      onBilling();
+      return;
+    }
+
+    if (isPremium) {
+      onNavigate('billing');
+      return;
+    }
+
+    window.dispatchEvent(new Event('studyflow:open-premium'));
   };
 
   return (
@@ -124,7 +140,7 @@ export function Sidebar({ activeView, onNavigate, profile, subscription, isPremi
 
           <div className="sidebar-profile-modal__actions">
             <Button variant="secondary" icon={<UserRound size={18} />} onClick={() => navigateFromModal('profile')}>Editar perfil</Button>
-            <Button variant={isPremium ? 'secondary' : 'primary'} icon={<CreditCard size={18} />} onClick={() => navigateFromModal('billing')}>
+            <Button variant={isPremium ? 'secondary' : 'primary'} icon={<CreditCard size={18} />} onClick={openBillingFromModal}>
               {isPremium ? 'Ver assinatura' : 'Assinar Premium'}
             </Button>
           </div>

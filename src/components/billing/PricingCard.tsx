@@ -1,4 +1,4 @@
-import { Crown, QrCode, ShieldCheck } from 'lucide-react';
+import { Crown, ShieldCheck } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { PremiumBenefits } from './PremiumBenefits';
 
@@ -12,10 +12,6 @@ export function PricingCard({ action }: { action: ReactNode }) {
       </header>
       <div className="pricing-card__price"><strong><sup>R$</sup>11,90</strong><span>por mês</span></div>
       <PremiumBenefits />
-      <div className="payment-method-note">
-        <QrCode size={16} />
-        <span>Pix disponível no checkout do Mercado Pago</span>
-      </div>
       {action}
       <footer><ShieldCheck size={15} /> Pagamento seguro via Mercado Pago</footer>
     </article>
