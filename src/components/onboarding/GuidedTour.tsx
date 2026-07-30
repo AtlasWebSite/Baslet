@@ -210,10 +210,10 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
   const [stepIndex, setStepIndex] = useState(0);
   const [highlight, setHighlight] = useState<HighlightRect>();
   const [interactionDone, setInteractionDone] = useState(false);
-  const [targetMissing, setTargetMissing] = useState(false);
   const [showSkipDialog, setShowSkipDialog] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const titleRef = useRef<HTMLHeadingElement>(null);
+  const activeStepIdRef = useRef('');
   const nextGestureRef = useRef(0);
   const consumedNextGestureRef = useRef<number | null>(null);
   const onNavigateRef = useRef(onNavigate);
@@ -230,6 +230,10 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
     onNavigateRef.current = onNavigate;
     onPrepareStepRef.current = onPrepareStep;
   }, [onNavigate, onPrepareStep]);
+
+  useEffect(() => {
+    activeStepIdRef.current = step.id;
+  }, [step.id]);
 
 
   const complete = useCallback(async (callback: () => Promise<void> | void) => {
@@ -252,6 +256,10 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
       return;
     }
 
+    // Remove o destaque da etapa atual no mesmo gesto que troca o índice.
+    // Isso impede que a próxima etapa seja renderizada usando o retângulo anterior.
+    setHighlight(undefined);
+
     setStepIndex((current) => {
       if (current !== stepIndex) return current;
       if (current >= tourSteps.length - 1) return current;
@@ -262,6 +270,8 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
   const retreatTour = useCallback(() => {
     if (stepIndex <= 0) return;
 
+    setHighlight(undefined);
+
     setStepIndex((current) => {
       if (current !== stepIndex) return current;
       return Math.max(current - 1, 0);
@@ -269,25 +279,29 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
   }, [stepIndex]);
 
   const refreshHighlight = useCallback(() => {
+    const stepId = step.id;
     const target = getVisibleTarget(step.target);
 
     if (!target) {
-      setHighlight(undefined);
-      setTargetMissing(true);
+      if (activeStepIdRef.current === stepId) setHighlight(undefined);
       return;
     }
 
-    setTargetMissing(false);
     target.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
-    window.setTimeout(() => setHighlight(getHighlightRect(target)), 180);
-  }, [step.target]);
+
+    window.setTimeout(() => {
+      // Um timeout iniciado por uma etapa antiga nunca pode atualizar a etapa atual.
+      if (activeStepIdRef.current !== stepId) return;
+      if (!target.isConnected) return;
+      setHighlight(getHighlightRect(target));
+    }, 180);
+  }, [step.id, step.target]);
 
   useEffect(() => {
     if (!active) return;
     onPrepareStepRef.current?.(step.id, step.view);
     onNavigateRef.current(step.view);
     setInteractionDone(false);
-    setTargetMissing(false);
     setHighlight(undefined);
 
     const timers = [180, 460, 820].map((delay) => window.setTimeout(refreshHighlight, delay));
@@ -348,8 +362,8 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
   };
 
   const cardPosition = useMemo(
-    () => getCardPosition(highlight, targetMissing ? 'center' : step.placement ?? 'bottom'),
-    [highlight, step.placement, targetMissing],
+    () => getCardPosition(highlight, step.placement ?? 'bottom'),
+    [highlight, step.placement],
   );
   const progress = Math.round(((stepIndex + 1) / tourSteps.length) * 100);
 
@@ -364,7 +378,7 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
             style={{ top: highlight.top, left: highlight.left, width: highlight.width, height: highlight.height }}
           />
         )}
-        {(highlight || targetMissing) && <section
+        {highlight && <section
           className={`guided-tour-card guided-tour-card--${cardPosition.placement}`}
           style={{ top: cardPosition.top, left: cardPosition.left }}
           role="dialog"
@@ -378,7 +392,7 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
           <div className="guided-tour-progress" aria-hidden="true"><span style={{ width: `${progress}%` }} /></div>
           <small>Etapa {stepIndex + 1} de {tourSteps.length}</small>
           <h2 id="guided-tour-title" ref={titleRef} tabIndex={-1}>{step.title}</h2>
-          <p>{targetMissing ? 'Estamos preparando este ponto da tela. Se ele não aparecer, avance manualmente para a próxima etapa.' : step.description}</p>
+          <p>{step.description}</p>
           {step.actionHint && <div className={interactionDone ? 'guided-tour-hint completed' : 'guided-tour-hint'}><MousePointerClick size={15} />{interactionDone ? 'Interação concluída.' : step.actionHint}</div>}
           <footer>
             <button type="button" className="skip-button" onClick={() => setShowSkipDialog(true)}>Pular tutorial</button>
