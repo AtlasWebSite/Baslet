@@ -36,7 +36,6 @@ import { MindMapsView } from './views/MindMapsView';
 const LEGACY_KEY = 'studyflow_sets_v1';
 const INITIAL_VIEW: ViewId = 'home';
 const nonStudyActionViews = new Set<ViewId>(['billing', 'profile']);
-const GUIDED_TOUR_ENABLED = import.meta.env.VITE_GUIDED_TOUR_ENABLED !== 'false';
 
 function getPaymentReturnStatus(pathname: string): PaymentReturnStatus | undefined {
   if (pathname === '/billing/success') return 'success';
@@ -112,9 +111,7 @@ function AuthenticatedApp({ user }: { user: NonNullable<ReturnType<typeof useAut
     window.addEventListener('studyflow:open-premium', openPremiumModal);
     return () => window.removeEventListener('studyflow:open-premium', openPremiumModal);
   }, []);
-  useEffect(() => {
-    if (!GUIDED_TOUR_ENABLED) return;
-    if (!profile || profileLoading || setsLoading || replayTutorial || walkthroughDismissed) return;
+  useEffect(() => {    if (!profile || profileLoading || setsLoading || replayTutorial || walkthroughDismissed) return;
     if (profile.walkthrough_completed || !profile.onboarding_completed || !starterSetsCreated || !studySets.length) return;
     setWalkthroughActive(true);
   }, [profile, profileLoading, replayTutorial, setsLoading, starterSetsCreated, studySets.length, walkthroughDismissed]);
@@ -122,7 +119,7 @@ function AuthenticatedApp({ user }: { user: NonNullable<ReturnType<typeof useAut
   if (profileLoading || billing.isLoading || setsLoading) return <LoadingState label={billing.isLoading ? 'Verificando assinatura...' : 'Sincronizando seus estudos...'}/>;
   if (profileError || !profile || setsError) return <div className="auth-error-screen"><h1>Não foi possível carregar sua conta</h1><p>{profileError ?? setsError ?? 'Perfil indisponível.'}</p><button onClick={() => window.location.reload()}>Tentar novamente</button></div>;
   const shouldShowFirstRunOnboarding = !profile.onboarding_completed && starterSetsCreated && !onboardingBypassed;
-  const tourPremiumAccess = billing.isPremium || (GUIDED_TOUR_ENABLED && walkthroughActive);
+  const tourPremiumAccess = billing.isPremium || walkthroughActive;
 
   const notify = (type: ToastMessage['type'], message: string) => setToast({ id: newId('toast'), type, message });
   const navigate = (view: ViewId) => { setActiveView(view); window.scrollTo({ top: 0, behavior: 'smooth' }); };
@@ -157,13 +154,7 @@ function AuthenticatedApp({ user }: { user: NonNullable<ReturnType<typeof useAut
   const deleteAccount = async () => { clearSensitiveState(); await deleteAccountService(); };
   const finishTutorial = async () => { if (!profile.onboarding_completed) await finishOnboarding(); setActiveView(INITIAL_VIEW); setReplayTutorial(false); };
   const finishGuidedTour = async () => { try { await finishWalkthrough(); } catch (reason) { notify('error', reason instanceof Error ? reason.message : 'Não foi possível salvar o status do tour.'); } setWalkthroughActive(false); setWalkthroughDismissed(true); setActiveView(INITIAL_VIEW); };
-  const replayGuidedTour = () => {
-    if (!GUIDED_TOUR_ENABLED) {
-      notify('info', 'O tour guiado está desligado no momento.');
-      return;
-    }
-
-    setReplayTutorial(false);
+  const replayGuidedTour = () => {    setReplayTutorial(false);
     setWalkthroughDismissed(false);
     setWalkthroughActive(true);
     setActiveView(INITIAL_VIEW);
@@ -187,12 +178,13 @@ function AuthenticatedApp({ user }: { user: NonNullable<ReturnType<typeof useAut
       if (!billing.isPremium) return paywall;
       return <div className="view billing-view"><SubscriptionStatusCard subscription={billing.subscription} refreshing={billing.isRefreshing} cancelling={billing.isCancelling} onRefresh={() => void billing.refresh()} onCancel={() => void cancelPlan()} onSubscribe={() => void billing.startSubscription()}/></div>;
     }
-    if (visibleView === 'profile') return <ProfileView profile={profile} studySets={studySets} isPremium={billing.isPremium} onBilling={openBilling} onClear={clear} onReplayTutorial={() => setReplayTutorial(true)} onReplayGuidedTour={GUIDED_TOUR_ENABLED ? replayGuidedTour : undefined} onSignOut={logout} onDeleteAccount={deleteAccount}/>;
+    if (visibleView === 'profile') return <ProfileView profile={profile} studySets={studySets} isPremium={billing.isPremium} onBilling={openBilling} onClear={clear} onReplayTutorial={() => setReplayTutorial(true)} onReplayGuidedTour={replayGuidedTour} onSignOut={logout} onDeleteAccount={deleteAccount}/>;
     return premiumContent();
   };
 
   if (paymentReturnStatus) return <PaymentStatusScreen status={paymentReturnStatus} isPremium={billing.isPremium} checking={billing.isRefreshing} errorMessage={billing.errorMessage} onCheck={() => void billing.refresh()} onContinue={() => { window.history.replaceState({}, document.title, '/'); setActiveView('home'); }}/>;
   if (shouldShowFirstRunOnboarding) return <OnboardingFlow onComplete={finishTutorial} onBypass={() => setOnboardingBypassed(true)} />;
 
-  return <div className="app-shell"><Sidebar activeView={visibleView} onNavigate={navigate} profile={profile} subscription={billing.subscription} isPremium={billing.isPremium}/><main className="main-content"><Header view={visibleView} search={search} onSearch={setSearch} onCreate={openCreate} userName={profile.full_name} showStudyActions={!nonStudyActionViews.has(visibleView)}/>{content()}</main><BottomNavigation activeView={visibleView} onNavigate={navigate} isPremium={billing.isPremium}/><Modal open={premiumOpen} onClose={() => setPremiumOpen(false)} hideHeader className="modal--premium" title="Assine o StudyFlow"><div className="premium-window">{premiumWindow}</div></Modal><Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Crie seu conjunto" description="Os dados serão salvos na sua conta."><CreateStudySetForm onSave={saveSet} onCancel={() => setCreateOpen(false)}/></Modal>{replayTutorial && <OnboardingFlow onComplete={finishTutorial} onBypass={() => setReplayTutorial(false)} />}<Modal open={Boolean(legacySets)} onClose={() => { localStorage.removeItem(LEGACY_KEY); setLegacySets(undefined); }} title="Encontramos estudos neste navegador" description="Você decide se quer levá-los para sua conta."><div className="legacy-import"><p>Os dados antigos não serão enviados sem sua autorização. Conjuntos com o mesmo nome serão ignorados.</p><div><Button variant="ghost" onClick={() => { localStorage.removeItem(LEGACY_KEY); setLegacySets(undefined); }}>Descartar dados locais</Button><Button loading={importing} onClick={() => void importLegacy()}>Importar para minha conta</Button></div></div></Modal>{GUIDED_TOUR_ENABLED && <GuidedTour active={walkthroughActive} onNavigate={navigate} onComplete={finishGuidedTour} onSkip={finishGuidedTour}/>} {toast && <Toast toast={toast} onClose={() => setToast(undefined)}/>}</div>;
+  return <div className="app-shell"><Sidebar activeView={visibleView} onNavigate={navigate} profile={profile} subscription={billing.subscription} isPremium={billing.isPremium}/><main className="main-content"><Header view={visibleView} search={search} onSearch={setSearch} onCreate={openCreate} userName={profile.full_name} showStudyActions={!nonStudyActionViews.has(visibleView)}/>{content()}</main><BottomNavigation activeView={visibleView} onNavigate={navigate} isPremium={billing.isPremium}/><Modal open={premiumOpen} onClose={() => setPremiumOpen(false)} hideHeader className="modal--premium" title="Assine o StudyFlow"><div className="premium-window">{premiumWindow}</div></Modal><Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Crie seu conjunto" description="Os dados serão salvos na sua conta."><CreateStudySetForm onSave={saveSet} onCancel={() => setCreateOpen(false)}/></Modal>{replayTutorial && <OnboardingFlow onComplete={finishTutorial} onBypass={() => setReplayTutorial(false)} />}<Modal open={Boolean(legacySets)} onClose={() => { localStorage.removeItem(LEGACY_KEY); setLegacySets(undefined); }} title="Encontramos estudos neste navegador" description="Você decide se quer levá-los para sua conta."><div className="legacy-import"><p>Os dados antigos não serão enviados sem sua autorização. Conjuntos com o mesmo nome serão ignorados.</p><div><Button variant="ghost" onClick={() => { localStorage.removeItem(LEGACY_KEY); setLegacySets(undefined); }}>Descartar dados locais</Button><Button loading={importing} onClick={() => void importLegacy()}>Importar para minha conta</Button></div></div></Modal><GuidedTour active={walkthroughActive} onNavigate={navigate} onComplete={finishGuidedTour} onSkip={finishGuidedTour}/> {toast && <Toast toast={toast} onClose={() => setToast(undefined)}/>}</div>;
 }
+

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { ArrowLeft, ArrowRight, CheckCircle2, Compass, Eye, HelpCircle, LayoutDashboard, Map, MousePointerClick, Play, Sparkles, X } from 'lucide-react';
 import type { ViewId } from '../../types';
 import { Button } from '../ui/Button';
@@ -207,7 +207,7 @@ export function GuidedTour({ active, onNavigate, onComplete, onSkip }: GuidedTou
   const [showSkipDialog, setShowSkipDialog] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const titleRef = useRef<HTMLHeadingElement>(null);
-  const advanceLockedRef = useRef(false);
+  const lastNavigationAtRef = useRef(0);
   const step = tourSteps[stepIndex];
   const Icon = stepIcons[stepIndex] ?? Sparkles;
   const isFirst = stepIndex === 0;
@@ -215,18 +215,13 @@ export function GuidedTour({ active, onNavigate, onComplete, onSkip }: GuidedTou
   const mustInteract = Boolean(step.interactionSelector);
   const canContinue = !mustInteract || interactionDone;
 
-  const moveToStep = useCallback((fromIndex: number, targetIndex: number) => {
-    if (advanceLockedRef.current) return;
+  const canNavigateTour = () => {
+    const now = window.performance.now();
+    if (now - lastNavigationAtRef.current < 500) return false;
 
-    advanceLockedRef.current = true;
-    setStepIndex((current) => {
-      if (current !== fromIndex) return current;
-      return Math.min(Math.max(targetIndex, 0), tourSteps.length - 1);
-    });
-    window.setTimeout(() => {
-      advanceLockedRef.current = false;
-    }, 650);
-  }, []);
+    lastNavigationAtRef.current = now;
+    return true;
+  };
 
   const refreshHighlight = useCallback(() => {
     const target = getVisibleTarget(step.target);
@@ -286,20 +281,26 @@ export function GuidedTour({ active, onNavigate, onComplete, onSkip }: GuidedTou
     }
   };
 
-  const goNext = () => {
+  const goNext = (event?: ReactMouseEvent<HTMLButtonElement>) => {
+    event?.preventDefault();
+    event?.stopPropagation();
     if (!canContinue) return;
+    if (!canNavigateTour()) return;
 
     if (isLast) {
       void complete(onComplete);
       return;
     }
 
-    moveToStep(stepIndex, stepIndex + 1);
+    setStepIndex((current) => Math.min(current + 1, tourSteps.length - 1));
   };
 
-  const goBack = () => {
+  const goBack = (event?: ReactMouseEvent<HTMLButtonElement>) => {
+    event?.preventDefault();
+    event?.stopPropagation();
     if (isFirst) return;
-    moveToStep(stepIndex, stepIndex - 1);
+    if (!canNavigateTour()) return;
+    setStepIndex((current) => Math.max(current - 1, 0));
   };
 
   const cardPosition = useMemo(() => getCardPosition(highlight, step.placement ?? 'bottom'), [highlight, step.placement]);
