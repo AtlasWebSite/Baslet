@@ -5,6 +5,7 @@ import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
 
 type TourPlacement = 'top' | 'bottom' | 'left' | 'right' | 'center';
+type TourAdvanceMode = 'button' | 'action';
 
 interface TourStep {
   id: string;
@@ -14,6 +15,7 @@ interface TourStep {
   description: string;
   placement?: TourPlacement;
   actionHint?: string;
+  advanceMode?: TourAdvanceMode;
   interactionSelector?: string;
 }
 
@@ -66,6 +68,7 @@ const tourSteps: TourStep[] = [
     description: 'Primeiro leia o termo, tente lembrar a resposta e depois vire o card para conferir a definição.',
     placement: 'bottom',
     actionHint: 'Clique no card para visualizar a resposta.',
+    advanceMode: 'action',
     interactionSelector: '[data-tour="flashcard-card"]',
   },
   {
@@ -76,6 +79,7 @@ const tourSteps: TourStep[] = [
     description: 'Use os controles para trocar de flashcard e manter sua revisão fluindo.',
     placement: 'left',
     actionHint: 'Clique na seta para ir ao próximo flashcard.',
+    advanceMode: 'action',
     interactionSelector: '[data-tour="flashcard-next"]',
   },
   {
@@ -102,6 +106,7 @@ const tourSteps: TourStep[] = [
     description: 'Escolha uma alternativa para ver o feedback imediato de acerto ou erro.',
     placement: 'bottom',
     actionHint: 'Clique em uma alternativa para continuar.',
+    advanceMode: 'action',
     interactionSelector: '[data-tour="quiz-answer"]',
   },
   {
@@ -206,45 +211,64 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
   const [highlight, setHighlight] = useState<HighlightRect>();
   const [interactionDone, setInteractionDone] = useState(false);
   const [targetMissing, setTargetMissing] = useState(false);
-  const [isChangingStep, setIsChangingStep] = useState(false);
   const [showSkipDialog, setShowSkipDialog] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const titleRef = useRef<HTMLHeadingElement>(null);
-  const lastNavigationAtRef = useRef(0);
-  const navigationLockedRef = useRef(false);
-  const navigationTimerRef = useRef<number | undefined>(undefined);
+  const advancedStepRef = useRef<number | null>(null);
   const onNavigateRef = useRef(onNavigate);
   const onPrepareStepRef = useRef(onPrepareStep);
   const step = tourSteps[stepIndex];
   const Icon = stepIcons[stepIndex] ?? Sparkles;
   const isFirst = stepIndex === 0;
   const isLast = stepIndex === tourSteps.length - 1;
-  const mustInteract = Boolean(step.interactionSelector);
-  const canContinue = (!mustInteract || interactionDone || targetMissing) && !isChangingStep;
+  const advanceMode = step.advanceMode ?? 'button';
+  const canUseNextButton = advanceMode === 'button';
+  const canContinue = canUseNextButton && !isSaving;
 
   useEffect(() => {
     onNavigateRef.current = onNavigate;
     onPrepareStepRef.current = onPrepareStep;
   }, [onNavigate, onPrepareStep]);
 
-  const canNavigateTour = () => {
-    if (navigationLockedRef.current) return false;
+  useEffect(() => {
+    advancedStepRef.current = null;
+  }, [stepIndex]);
 
-    const now = window.performance.now();
-    if (now - lastNavigationAtRef.current < 500) return false;
+  const complete = useCallback(async (callback: () => Promise<void> | void) => {
+    setIsSaving(true);
+    try {
+      await callback();
+    } finally {
+      setIsSaving(false);
+    }
+  }, []);
 
-    lastNavigationAtRef.current = now;
-    navigationLockedRef.current = true;
-    setIsChangingStep(true);
+  const advanceTour = useCallback(() => {
+    if (advancedStepRef.current === stepIndex) return;
 
-    if (navigationTimerRef.current) window.clearTimeout(navigationTimerRef.current);
-    navigationTimerRef.current = window.setTimeout(() => {
-      navigationLockedRef.current = false;
-      setIsChangingStep(false);
-    }, 520);
+    advancedStepRef.current = stepIndex;
 
-    return true;
-  };
+    if (stepIndex >= tourSteps.length - 1) {
+      void complete(onComplete);
+      return;
+    }
+
+    setStepIndex((current) => {
+      if (current !== stepIndex) return current;
+      if (current >= tourSteps.length - 1) return current;
+      return current + 1;
+    });
+  }, [complete, onComplete, stepIndex]);
+
+  const retreatTour = useCallback(() => {
+    if (stepIndex <= 0) return;
+
+    advancedStepRef.current = null;
+    setStepIndex((current) => {
+      if (current !== stepIndex) return current;
+      return Math.max(current - 1, 0);
+    });
+  }, [stepIndex]);
 
   const refreshHighlight = useCallback(() => {
     const target = getVisibleTarget(step.target);
@@ -272,13 +296,6 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
     return () => timers.forEach((timer) => window.clearTimeout(timer));
   }, [active, refreshHighlight, step.id, step.view]);
 
-  useEffect(() => {
-    return () => {
-      if (!navigationTimerRef.current) return;
-      window.clearTimeout(navigationTimerRef.current);
-    };
-  }, []);
-
   useLayoutEffect(() => {
     if (!active) return;
     refreshHighlight();
@@ -294,7 +311,7 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
   }, [active, refreshHighlight]);
 
   useEffect(() => {
-    if (!active || !step.interactionSelector) return;
+    if (!active || advanceMode !== 'action' || !step.interactionSelector) return;
 
     const trackInteraction = (event: MouseEvent) => {
       const target = event.target as HTMLElement | null;
@@ -302,41 +319,25 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
       if (!target?.closest(step.interactionSelector ?? '')) return;
 
       setInteractionDone(true);
+      advanceTour();
     };
 
     document.addEventListener('click', trackInteraction, true);
     return () => document.removeEventListener('click', trackInteraction, true);
-  }, [active, step]);
-
-  const complete = async (callback: () => Promise<void> | void) => {
-    setIsSaving(true);
-    try {
-      await callback();
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  }, [active, advanceTour, advanceMode, step]);
 
   const goNext = (event?: ReactMouseEvent<HTMLButtonElement>) => {
     event?.preventDefault();
     event?.stopPropagation();
     if (!canContinue) return;
-    if (!canNavigateTour()) return;
-
-    if (isLast) {
-      void complete(onComplete);
-      return;
-    }
-
-    setStepIndex((current) => Math.min(current + 1, tourSteps.length - 1));
+    advanceTour();
   };
 
   const goBack = (event?: ReactMouseEvent<HTMLButtonElement>) => {
     event?.preventDefault();
     event?.stopPropagation();
     if (isFirst) return;
-    if (!canNavigateTour()) return;
-    setStepIndex((current) => Math.max(current - 1, 0));
+    retreatTour();
   };
 
   const cardPosition = useMemo(
@@ -375,8 +376,8 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
           <footer>
             <button type="button" className="skip-button" onClick={() => setShowSkipDialog(true)}>Pular tutorial</button>
             <div>
-              <Button type="button" variant="secondary" icon={<ArrowLeft size={16} />} onClick={goBack} disabled={isFirst || isSaving || isChangingStep}>Voltar</Button>
-              <Button type="button" icon={isLast ? <CheckCircle2 size={16} /> : <ArrowRight size={16} />} onClick={goNext} disabled={!canContinue || isSaving || isChangingStep} loading={isSaving}>
+              <Button type="button" variant="secondary" icon={<ArrowLeft size={16} />} onClick={goBack} disabled={isFirst || isSaving}>Voltar</Button>
+              <Button type="button" icon={isLast ? <CheckCircle2 size={16} /> : <ArrowRight size={16} />} onClick={goNext} disabled={!canContinue || isSaving} loading={isSaving}>
                 {isLast ? 'Finalizar' : 'Próximo'}
               </Button>
             </div>

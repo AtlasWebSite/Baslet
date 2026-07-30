@@ -98,6 +98,7 @@ export function OnboardingFlow({ onComplete, onBypass }: OnboardingFlowProps) {
   const [error, setError] = useState('');
   const titleRef = useRef<HTMLHeadingElement>(null);
   const dialogRef = useRef<HTMLElement>(null);
+  const advancedStepRef = useRef<number | null>(null);
   const currentQuestion = questions[step];
   const selectedOptionId = currentQuestion ? answers[currentQuestion.id] : undefined;
   const progress = showCompletion ? 100 : Math.round(((step + 1) / questions.length) * 100);
@@ -113,6 +114,7 @@ export function OnboardingFlow({ onComplete, onBypass }: OnboardingFlowProps) {
 
   useEffect(() => {
     titleRef.current?.focus();
+    advancedStepRef.current = null;
   }, [step, showCompletion]);
 
   useEffect(() => () => setAnswers({}), []);
@@ -147,18 +149,27 @@ export function OnboardingFlow({ onComplete, onBypass }: OnboardingFlowProps) {
     setAnswers((current) => ({ ...current, [currentQuestion.id]: optionId }));
   };
 
-  const continueFlow = () => {
+  const advanceOnboarding = () => {
     if (!currentQuestion || !selectedOptionId) return;
+    if (advancedStepRef.current === step) return;
+
+    advancedStepRef.current = step;
 
     if (step === questions.length - 1) {
       setShowCompletion(true);
       return;
     }
 
-    setStep((current) => current + 1);
+    setStep((current) => Math.min(current + 1, questions.length - 1));
+  };
+
+  const continueFlow = () => {
+    advanceOnboarding();
   };
 
   const goBack = () => {
+    advancedStepRef.current = null;
+
     if (showCompletion) {
       setShowCompletion(false);
       return;
