@@ -180,32 +180,28 @@ export function ProgressView({ studySets }: { studySets: StudySet[] }) {
       </div>
 
       <div className="progress-focus-grid">
-        <section className="chart-card progress-subject-volume-card">
+        <section className="chart-card progress-subject-learning-card">
           <div className="section-heading">
             <div>
-              <span className="eyebrow">VOLUME</span>
-              <h2>Quantidade por matéria</h2>
+              <span className="eyebrow">APRENDIZADO</span>
+              <h2>Evolução por matéria</h2>
             </div>
             <Layers3 size={21} />
           </div>
-          <p className="volume-chart-note">Comparativo de quantos cards existem em cada matéria. Não representa limite.</p>
-          <div className="subject-volume-list">
-            {subjects.map((subject) => {
-              const largestSubject = Math.max(...subjects.map((current) => current.cards), 1);
-              const width = Math.max(12, Math.round((subject.cards / largestSubject) * 100));
-              return (
-                <div key={subject.subject}>
-                  <div>
-                    <span className="subject-dot" style={{ background: subject.color }} />
-                    <strong>{subject.subject}</strong>
-                    <small>{subject.cards} cards</small>
-                  </div>
-                  <div className="subject-volume-track">
-                    <span style={{ width: `${width}%`, background: subject.color }} />
-                  </div>
+          <p className="learning-chart-note">Mostra quanto você já avançou em cada matéria com base nas respostas dos flashcards.</p>
+          <div className="subject-learning-list">
+            {subjects.map((subject) => (
+              <div key={subject.subject}>
+                <div>
+                  <span className="subject-dot" style={{ background: subject.color }} />
+                  <strong>{subject.subject}</strong>
+                  <small>{subject.progress}% aprendido</small>
                 </div>
-              );
-            })}
+                <div className="subject-learning-track" aria-label={`${subject.subject}: ${subject.progress}% aprendido`}>
+                  <span style={{ width: `${subject.progress}%`, background: subject.color }} />
+                </div>
+              </div>
+            ))}
           </div>
         </section>
 
