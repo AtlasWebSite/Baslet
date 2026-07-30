@@ -177,32 +177,55 @@ function getHighlightRect(element: HTMLElement): HighlightRect {
 
 function getCardPosition(rect: HighlightRect | undefined, placement: TourPlacement) {
   const cardWidth = Math.min(360, window.innerWidth - 28);
-  const cardHeight = 245;
-  const gap = 18;
+  const cardHeight = 300;
+  const gap = 24;
+  const margin = 14;
 
   if (!rect || placement === 'center') {
     return {
-      top: Math.max(14, (window.innerHeight - cardHeight) / 2),
-      left: Math.max(14, (window.innerWidth - cardWidth) / 2),
+      top: Math.max(margin, (window.innerHeight - cardHeight) / 2),
+      left: Math.max(margin, (window.innerWidth - cardWidth) / 2),
       placement: 'center' as TourPlacement,
     };
   }
 
   const centerX = rect.left + rect.width / 2;
   const centerY = rect.top + rect.height / 2;
-  const positions = {
+  const positions: Record<TourPlacement, { top: number; left: number }> = {
     bottom: { top: rect.top + rect.height + gap, left: centerX - cardWidth / 2 },
     top: { top: rect.top - cardHeight - gap, left: centerX - cardWidth / 2 },
     right: { top: centerY - cardHeight / 2, left: rect.left + rect.width + gap },
     left: { top: centerY - cardHeight / 2, left: rect.left - cardWidth - gap },
     center: { top: (window.innerHeight - cardHeight) / 2, left: (window.innerWidth - cardWidth) / 2 },
   };
-  const preferred = positions[placement];
+
+  const wouldFit = ({ top, left }: { top: number; left: number }) => (
+    top >= margin &&
+    left >= margin &&
+    top + cardHeight <= window.innerHeight - margin &&
+    left + cardWidth <= window.innerWidth - margin
+  );
+
+  const wouldOverlapTarget = ({ top, left }: { top: number; left: number }) => {
+    const card = { top, left, right: left + cardWidth, bottom: top + cardHeight };
+    const target = {
+      top: rect.top - gap / 2,
+      left: rect.left - gap / 2,
+      right: rect.left + rect.width + gap / 2,
+      bottom: rect.top + rect.height + gap / 2,
+    };
+
+    return card.left < target.right && card.right > target.left && card.top < target.bottom && card.bottom > target.top;
+  };
+
+  const candidates = [placement, 'bottom', 'top', 'right', 'left', 'center'].filter((value, index, list) => list.indexOf(value) === index) as TourPlacement[];
+  const availablePlacement = candidates.find((candidate) => wouldFit(positions[candidate]) && !wouldOverlapTarget(positions[candidate]));
+  const preferred = positions[availablePlacement ?? placement];
 
   return {
-    top: Math.min(Math.max(14, preferred.top), window.innerHeight - cardHeight - 14),
-    left: Math.min(Math.max(14, preferred.left), window.innerWidth - cardWidth - 14),
-    placement,
+    top: Math.min(Math.max(margin, preferred.top), window.innerHeight - cardHeight - margin),
+    left: Math.min(Math.max(margin, preferred.left), window.innerWidth - cardWidth - margin),
+    placement: availablePlacement ?? placement,
   };
 }
 
