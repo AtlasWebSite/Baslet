@@ -1563,6 +1563,8 @@ h1,h2,h3,p { margin-top: 0; }
   }
 }
 
+
+
 @media (max-width:560px){
   .delete-account-dialog{padding:18px}
   .delete-account-warning{align-items:flex-start}
@@ -1886,5 +1888,154 @@ h1,h2,h3,p { margin-top: 0; }
 
   .login-panel .google-button{
     width:100%;
+  }
+}
+
+/* Readability pass: small interface text */
+.topbar__title p,
+.view > p,
+.mind-view-actions p,
+.subscription-hero p,
+.profile-card p,
+.empty-state p,
+.mind-first-state p,
+.daily-card > p,
+.privacy-note p,
+.profile-footer-note,
+.callback-card p,
+.starter-warning{
+  font-size:14px;
+  line-height:1.65;
+}
+
+.eyebrow,
+.section-heading > span,
+.profile-stats span,
+.daily-card__top small,
+.quiz-set-selector small,
+.map-selector .eyebrow,
+.mind-details header small,
+.mind-details > label,
+.mind-details > div > span,
+.guided-tour-card small{
+  font-size:10.5px;
+}
+
+.button,
+.nav-item,
+.filter-pills button,
+.view-controls button,
+.section-heading > button,
+.set-card__footer button,
+.study-toolbar > button:first-child,
+.study-toolbar label,
+.study-toolbar select,
+.map-selector label,
+.map-selector select,
+.quiz-set-selector select,
+.quiz-set-selector label,
+.billing-signout{
+  font-size:13px;
+}
+
+.search input,
+.set-card__content p,
+.progress-label,
+.set-card__footer > span,
+.quick-card small,
+.daily-card__footer,
+.stat-card div > span,
+.stat-card small,
+.chart-row,
+.subject-row,
+.setting-row small,
+.profile-main p,
+.saved-map__open small,
+.mind-details > small,
+.mind-details__relation small,
+.mind-node__content em,
+.quiz-header > div:first-child,
+.quiz-footer p,
+.card-navigation span,
+.flashcard__face > span,
+.rating small,
+.onboarding-card > header > span,
+.skip-button{
+  font-size:12px;
+  line-height:1.55;
+}
+
+.set-card__content > span,
+.premium-badge,
+.level-badge,
+.trend,
+.daily-card__top small,
+.saved-maps .section-heading > span,
+.mind-toolbar__details button,
+.mind-mode button,
+.mind-node__content small{
+  font-size:10px;
+}
+
+.set-card__content h3,
+.quick-card strong,
+.daily-card__top strong,
+.stat-card div > span + small,
+.setting-row strong,
+.quiz-set-selector strong,
+.map-selector label,
+.saved-map__open strong,
+.mind-details header strong,
+.mind-node__content strong{
+  font-size:14px;
+  line-height:1.35;
+}
+
+.empty-state h3,
+.mind-first-state h2,
+.subscription-card h3,
+.profile-main h2,
+.settings-card h2,
+.chart-card h2,
+.subject-progress h2,
+.quiz-question h2{
+  line-height:1.25;
+}
+
+.premium-benefits li,
+.subscription-card li,
+.subscription-benefit,
+.pricing-benefit,
+.billing-feature,
+.profile-stats strong{
+  font-size:14px;
+}
+
+@media(max-width:640px){
+  .topbar__title p,
+  .view > p,
+  .empty-state p,
+  .mind-first-state p,
+  .subscription-hero p,
+  .profile-card p,
+  .privacy-note p{
+    font-size:13px;
+  }
+
+  .button,
+  .filter-pills button,
+  .view-controls button,
+  .set-card__content p,
+  .progress-label,
+  .quick-card small,
+  .setting-row small,
+  .quiz-footer p,
+  .map-selector select,
+  .quiz-set-selector select{
+    font-size:12px;
+  }
+
+  .bottom-nav button{
+    font-size:9px;
   }
 }
