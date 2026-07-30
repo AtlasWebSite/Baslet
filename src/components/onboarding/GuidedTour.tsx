@@ -27,6 +27,7 @@ interface HighlightRect {
 interface GuidedTourProps {
   active: boolean;
   onNavigate: (view: ViewId) => void;
+  onPrepareStep?: (stepId: string, view: ViewId) => void;
   onComplete: () => Promise<void> | void;
   onSkip: () => Promise<void> | void;
 }
@@ -200,7 +201,7 @@ function getCardPosition(rect: HighlightRect | undefined, placement: TourPlaceme
   };
 }
 
-export function GuidedTour({ active, onNavigate, onComplete, onSkip }: GuidedTourProps) {
+export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSkip }: GuidedTourProps) {
   const [stepIndex, setStepIndex] = useState(0);
   const [highlight, setHighlight] = useState<HighlightRect>();
   const [interactionDone, setInteractionDone] = useState(false);
@@ -208,6 +209,7 @@ export function GuidedTour({ active, onNavigate, onComplete, onSkip }: GuidedTou
   const [isSaving, setIsSaving] = useState(false);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const lastNavigationAtRef = useRef(0);
+  const missingTargetAttemptsRef = useRef(0);
   const step = tourSteps[stepIndex];
   const Icon = stepIcons[stepIndex] ?? Sparkles;
   const isFirst = stepIndex === 0;
@@ -228,20 +230,27 @@ export function GuidedTour({ active, onNavigate, onComplete, onSkip }: GuidedTou
 
     if (!target) {
       setHighlight(undefined);
+      missingTargetAttemptsRef.current += 1;
+      if (missingTargetAttemptsRef.current >= 2) {
+        missingTargetAttemptsRef.current = 0;
+        setStepIndex((current) => Math.min(current + 1, tourSteps.length - 1));
+      }
       return;
     }
 
+    missingTargetAttemptsRef.current = 0;
     target.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
     window.setTimeout(() => setHighlight(getHighlightRect(target)), 180);
   }, [step.target]);
 
   useEffect(() => {
     if (!active) return;
+    onPrepareStep?.(step.id, step.view);
     onNavigate(step.view);
     setInteractionDone(false);
     const timer = window.setTimeout(refreshHighlight, 260);
     return () => window.clearTimeout(timer);
-  }, [active, onNavigate, refreshHighlight, step.id, step.view]);
+  }, [active, onNavigate, onPrepareStep, refreshHighlight, step.id, step.view]);
 
   useLayoutEffect(() => {
     if (!active) return;
@@ -317,7 +326,7 @@ export function GuidedTour({ active, onNavigate, onComplete, onSkip }: GuidedTou
             style={{ top: highlight.top, left: highlight.left, width: highlight.width, height: highlight.height }}
           />
         )}
-        <section
+        {highlight && <section
           className={`guided-tour-card guided-tour-card--${cardPosition.placement}`}
           style={{ top: cardPosition.top, left: cardPosition.left }}
           role="dialog"
@@ -342,7 +351,7 @@ export function GuidedTour({ active, onNavigate, onComplete, onSkip }: GuidedTou
               </Button>
             </div>
           </footer>
-        </section>
+        </section>}
       </div>
       <Modal open={showSkipDialog} onClose={() => setShowSkipDialog(false)} title="Pular tour guiado" description="Você pode explorar o StudyFlow por conta própria e reiniciar este tour pelo perfil quando quiser." className="modal--tour-skip">
         <div className="tour-skip-dialog">
