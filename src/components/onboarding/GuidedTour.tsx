@@ -243,7 +243,7 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
     }
   }, []);
 
-  const advanceTour = useCallback(() => {
+  const nextStep = useCallback(() => {
     if (advancingRef.current) return;
 
     advancingRef.current = true;
@@ -319,18 +319,18 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
       if (!target?.closest(step.interactionSelector ?? '')) return;
 
       setInteractionDone(true);
-      advanceTour();
+      nextStep();
     };
 
     document.addEventListener('click', trackInteraction, true);
     return () => document.removeEventListener('click', trackInteraction, true);
-  }, [active, advanceTour, advanceMode, step]);
+  }, [active, advanceMode, nextStep, step]);
 
   const goNext = (event?: ReactMouseEvent<HTMLButtonElement>) => {
     event?.preventDefault();
     event?.stopPropagation();
     if (!canContinue) return;
-    advanceTour();
+    nextStep();
   };
 
   const goBack = (event?: ReactMouseEvent<HTMLButtonElement>) => {

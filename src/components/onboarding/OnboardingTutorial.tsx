@@ -12,7 +12,7 @@ const steps = [
   { icon: CheckCircle2, title: 'Pronto para começar', text: 'Você já tem alguns flashcards iniciais para testar o app. Depois, crie seus próprios conjuntos personalizados.' },
 ];
 
-export function OnboardingTutorial({ onComplete }: { onComplete: () => Promise<void> | void }) {
+export function OnboardingTutorial({ onComplete }: { onComplete: () =>Promise<void> | void }) {
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>();
@@ -59,7 +59,7 @@ export function OnboardingTutorial({ onComplete }: { onComplete: () => Promise<v
         <header>
           <Logo compact />
           <span>{step + 1} de {steps.length}</span>
-          <button onClick={() => void finish()} aria-label="Pular tutorial"><X size={19} /></button>
+          <button type="button" onClick={() => void finish()} aria-label="Pular tutorial"><X size={19} /></button>
         </header>
         <div className="step-track">{steps.map((_, index) => <span key={index} className={index <= step ? 'active' : ''} />)}</div>
         <div className="onboarding-content" key={step}>
@@ -74,13 +74,13 @@ export function OnboardingTutorial({ onComplete }: { onComplete: () => Promise<v
           {error && <small className="error-text">{error}</small>}
         </div>
         <footer>
-          <button className="skip-button" onClick={() => void finish()} disabled={saving}>Pular</button>
+          <button type="button" className="skip-button" onClick={() => void finish()} disabled={saving}>Pular</button>
           <div>
-            {step > 0 && <Button variant="ghost" icon={<ArrowLeft size={17} />} onClick={previousStep}>Voltar</Button>}
+            {step > 0 && <Button type="button" variant="ghost" icon={<ArrowLeft size={17} />} onClick={previousStep}>Voltar</Button>}
             {isLast ? (
-              <Button loading={saving} icon={<CheckCircle2 size={17} />} onClick={() => void finish()}>Começar agora</Button>
+              <Button type="button" loading={saving} icon={<CheckCircle2 size={17} />} onClick={() => void finish()}>Começar agora</Button>
             ) : (
-              <Button icon={<ArrowRight size={17} />} onClick={nextStep}>Próximo</Button>
+              <Button type="button" icon={<ArrowRight size={17} />} onClick={nextStep}>Próximo</Button>
             )}
           </div>
         </footer>
@@ -88,3 +88,4 @@ export function OnboardingTutorial({ onComplete }: { onComplete: () => Promise<v
     </div>
   );
 }
+

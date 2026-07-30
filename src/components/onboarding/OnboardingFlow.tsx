@@ -210,7 +210,7 @@ export function OnboardingFlow({ onComplete, onBypass }: OnboardingFlowProps) {
         <header>
           <Logo compact />
           <span>{showCompletion ? 'Concluído' : `Etapa ${step + 1} de ${questions.length}`}</span>
-          <button onClick={() => setSkipOpen(true)} aria-label="Pular onboarding">Pular</button>
+          <button type="button" onClick={() => setSkipOpen(true)} aria-label="Pular onboarding">Pular</button>
         </header>
 
         <div className="step-track" aria-hidden="true">
@@ -229,13 +229,13 @@ export function OnboardingFlow({ onComplete, onBypass }: OnboardingFlowProps) {
         )}
 
         <footer>
-          <button className="skip-button" onClick={() => setSkipOpen(true)} disabled={saving}>Pular por enquanto</button>
+          <button type="button" className="skip-button" onClick={() => setSkipOpen(true)} disabled={saving}>Pular por enquanto</button>
           <div>
-            {(step > 0 || showCompletion) && <Button variant="ghost" icon={<ArrowLeft size={17} />} onClick={goBack} disabled={saving}>Voltar</Button>}
+            {(step > 0 || showCompletion) && <Button type="button" variant="ghost" icon={<ArrowLeft size={17} />} onClick={goBack} disabled={saving}>Voltar</Button>}
             {showCompletion ? (
-              <Button loading={saving} icon={<CheckCircle2 size={17} />} onClick={() => void complete()}>Começar a estudar</Button>
+              <Button type="button" loading={saving} icon={<CheckCircle2 size={17} />} onClick={() => void complete()}>Começar a estudar</Button>
             ) : (
-              <Button icon={<ArrowRight size={17} />} onClick={handleContinue} disabled={!selectedOptionId}>Continuar</Button>
+              <Button type="button" icon={<ArrowRight size={17} />} onClick={handleContinue} disabled={!selectedOptionId}>Continuar</Button>
             )}
           </div>
         </footer>
@@ -243,8 +243,8 @@ export function OnboardingFlow({ onComplete, onBypass }: OnboardingFlowProps) {
 
       <Modal open={skipOpen} onClose={() => setSkipOpen(false)} title="Pular configuração" description={`Você pode começar agora e explorar o ${APP_NAME} por conta própria.`} className="modal--skip-onboarding">
         <div className="skip-onboarding-dialog">
-          <Button variant="secondary" onClick={() => setSkipOpen(false)}>Continuar configuração</Button>
-          <Button loading={saving} onClick={() => void confirmSkip()}>Pular</Button>
+          <Button type="button" variant="secondary" onClick={() => setSkipOpen(false)}>Continuar configuração</Button>
+          <Button type="button" loading={saving} onClick={() => void confirmSkip()}>Pular</Button>
         </div>
       </Modal>
     </div>
@@ -325,3 +325,5 @@ function OnboardingCompletion({
     </div>
   );
 }
+
+
