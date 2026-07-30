@@ -214,7 +214,7 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
   const [showSkipDialog, setShowSkipDialog] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const titleRef = useRef<HTMLHeadingElement>(null);
-  const advancingRef = useRef(false);
+  const lastAdvanceEventRef = useRef<number | null>(null);
   const onNavigateRef = useRef(onNavigate);
   const onPrepareStepRef = useRef(onPrepareStep);
   const step = tourSteps[stepIndex];
@@ -230,10 +230,6 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
     onPrepareStepRef.current = onPrepareStep;
   }, [onNavigate, onPrepareStep]);
 
-  useEffect(() => {
-    advancingRef.current = false;
-  }, [stepIndex]);
-
   const complete = useCallback(async (callback: () => Promise<void> | void) => {
     setIsSaving(true);
     try {
@@ -243,10 +239,10 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
     }
   }, []);
 
-  const nextStep = useCallback(() => {
-    if (advancingRef.current) return;
-
-    advancingRef.current = true;
+  const nextStep = useCallback((eventTimeStamp: number) => {
+    // Impede que o mesmo clique consuma duas etapas apos a re-renderizacao.
+    if (lastAdvanceEventRef.current === eventTimeStamp) return;
+    lastAdvanceEventRef.current = eventTimeStamp;
 
     if (stepIndex >= tourSteps.length - 1) {
       void complete(onComplete);
@@ -254,6 +250,7 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
     }
 
     setStepIndex((current) => {
+      // Bloqueia callbacks antigos caso a etapa ja tenha mudado.
       if (current !== stepIndex) return current;
       if (current >= tourSteps.length - 1) return current;
       return current + 1;
@@ -263,7 +260,6 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
   const retreatTour = useCallback(() => {
     if (stepIndex <= 0) return;
 
-    advancingRef.current = false;
     setStepIndex((current) => {
       if (current !== stepIndex) return current;
       return Math.max(current - 1, 0);
@@ -319,18 +315,18 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
       if (!target?.closest(step.interactionSelector ?? '')) return;
 
       setInteractionDone(true);
-      nextStep();
+      nextStep(event.timeStamp);
     };
 
     document.addEventListener('click', trackInteraction, true);
     return () => document.removeEventListener('click', trackInteraction, true);
   }, [active, advanceMode, nextStep, step]);
 
-  const goNext = (event?: ReactMouseEvent<HTMLButtonElement>) => {
-    event?.preventDefault();
-    event?.stopPropagation();
+  const goNext = (event: ReactMouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
     if (!canContinue) return;
-    nextStep();
+    nextStep(event.timeStamp);
   };
 
   const goBack = (event?: ReactMouseEvent<HTMLButtonElement>) => {
