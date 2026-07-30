@@ -180,22 +180,29 @@ export function ProgressView({ studySets }: { studySets: StudySet[] }) {
       </div>
 
       <div className="progress-focus-grid">
-        <section className="chart-card progress-column-chart">
+        <section className="chart-card progress-subject-volume-card">
           <div className="section-heading">
             <div>
               <span className="eyebrow">VOLUME</span>
-              <h2>Cards por matéria</h2>
+              <h2>Quantidade por matéria</h2>
             </div>
             <Layers3 size={21} />
           </div>
-          <div className="subject-columns">
+          <p className="volume-chart-note">Comparativo de quantos cards existem em cada matéria. Não representa limite.</p>
+          <div className="subject-volume-list">
             {subjects.map((subject) => {
-              const height = Math.max(12, Math.round((subject.cards / cards.length) * 100));
+              const largestSubject = Math.max(...subjects.map((current) => current.cards), 1);
+              const width = Math.max(12, Math.round((subject.cards / largestSubject) * 100));
               return (
                 <div key={subject.subject}>
-                  <div><span style={{ height: `${height}%`, background: subject.color }} /></div>
-                  <strong>{subject.cards}</strong>
-                  <small>{subject.subject}</small>
+                  <div>
+                    <span className="subject-dot" style={{ background: subject.color }} />
+                    <strong>{subject.subject}</strong>
+                    <small>{subject.cards} cards</small>
+                  </div>
+                  <div className="subject-volume-track">
+                    <span style={{ width: `${width}%`, background: subject.color }} />
+                  </div>
                 </div>
               );
             })}
