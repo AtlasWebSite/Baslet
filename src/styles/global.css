@@ -2039,3 +2039,79 @@ h1,h2,h3,p { margin-top: 0; }
     font-size:9px;
   }
 }
+
+/* Extra readability for dense cards */
+.chart-row,
+.chart-row span,
+.chart-row strong,
+.chart-summary,
+.chart-summary strong,
+.subject-list strong,
+.subject-list small,
+.subject-row,
+.subject-row span,
+.subject-row strong{
+  font-size:14px!important;
+  line-height:1.55!important;
+}
+
+.chart-card .eyebrow,
+.subject-progress .eyebrow,
+.settings-card .eyebrow,
+.profile-card .level-badge,
+.subscription-hero__badge,
+.pricing-card .eyebrow,
+.trend{
+  font-size:11.5px!important;
+}
+
+.insight-card strong,
+.insight-card p,
+.privacy-note p,
+.profile-footer-note,
+.profile-stats span,
+.subscription-hero>p,
+.pricing-card footer,
+.billing-signout{
+  font-size:14px!important;
+  line-height:1.6!important;
+}
+
+.profile-stats strong{
+  font-size:20px!important;
+}
+
+.profile-main p,
+.level-badge{
+  font-size:12px!important;
+  line-height:1.4!important;
+}
+
+.premium-benefits strong,
+.premium-benefits>div,
+.billing-error,
+.subscription-status header small,
+.subscription-status header>strong,
+.subscription-status__grid small,
+.subscription-status__grid strong,
+.subscription-status__note{
+  font-size:13px!important;
+  line-height:1.45!important;
+}
+
+.pricing-card footer{
+  margin-top:16px;
+}
+
+@media(max-width:640px){
+  .chart-row,
+  .subject-list strong,
+  .subject-list small,
+  .insight-card p,
+  .premium-benefits strong,
+  .billing-error,
+  .pricing-card footer,
+  .billing-signout{
+    font-size:13px!important;
+  }
+}
