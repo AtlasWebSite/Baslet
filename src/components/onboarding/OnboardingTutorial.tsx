@@ -1,5 +1,5 @@
 import { ArrowLeft, ArrowRight, BarChart3, BookOpen, CheckCircle2, Layers3, Sparkles, Target, X } from 'lucide-react';
-import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
+import { useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import { Button } from '../ui/Button';
 import { Logo } from '../logo/Logo';
 
@@ -16,28 +16,36 @@ export function OnboardingTutorial({ onComplete }: { onComplete: () =>Promise<vo
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>();
-  const advancingRef = useRef(false);
+  const nextGestureRef = useRef(0);
+  const consumedNextGestureRef = useRef<number | null>(null);
   const current = steps[step];
   const Icon = current.icon;
   const isLast = step === steps.length - 1;
 
-  useEffect(() => {
-    advancingRef.current = false;
-  }, [step]);
+
+  const beginPointerGesture = () => {
+    nextGestureRef.current += 1;
+  };
+
+  const beginKeyboardGesture = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    nextGestureRef.current += 1;
+  };
 
   const nextStep = (event: ReactMouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     event.stopPropagation();
-    if (advancingRef.current) return;
 
-    advancingRef.current = true;
+    const gestureId = nextGestureRef.current;
+    if (consumedNextGestureRef.current === gestureId) return;
+    consumedNextGestureRef.current = gestureId;
+
     setStep((value) => Math.min(value + 1, steps.length - 1));
   };
 
   const previousStep = (event: ReactMouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     event.stopPropagation();
-    advancingRef.current = false;
     setStep((value) => Math.max(value - 1, 0));
   };
 
@@ -75,7 +83,7 @@ export function OnboardingTutorial({ onComplete }: { onComplete: () =>Promise<vo
         </div>
         <footer>
           <button type="button" className="skip-button" onClick={() => void finish()} disabled={saving}>Pular</button>
-          <div>
+          <div onPointerDownCapture={beginPointerGesture} onKeyDownCapture={beginKeyboardGesture}>
             {step > 0 && <Button type="button" variant="ghost" icon={<ArrowLeft size={17} />} onClick={previousStep}>Voltar</Button>}
             {isLast ? (
               <Button type="button" loading={saving} icon={<CheckCircle2 size={17} />} onClick={() => void finish()}>Começar agora</Button>

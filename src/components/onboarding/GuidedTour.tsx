@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import { ArrowLeft, ArrowRight, CheckCircle2, Compass, Eye, HelpCircle, LayoutDashboard, Map, MousePointerClick, Play, Sparkles, X } from 'lucide-react';
 import type { ViewId } from '../../types';
 import { Button } from '../ui/Button';
@@ -214,7 +214,8 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
   const [showSkipDialog, setShowSkipDialog] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const titleRef = useRef<HTMLHeadingElement>(null);
-  const lastAdvanceEventRef = useRef<number | null>(null);
+  const nextGestureRef = useRef(0);
+  const consumedNextGestureRef = useRef<number | null>(null);
   const onNavigateRef = useRef(onNavigate);
   const onPrepareStepRef = useRef(onPrepareStep);
   const step = tourSteps[stepIndex];
@@ -230,6 +231,7 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
     onPrepareStepRef.current = onPrepareStep;
   }, [onNavigate, onPrepareStep]);
 
+
   const complete = useCallback(async (callback: () => Promise<void> | void) => {
     setIsSaving(true);
     try {
@@ -239,10 +241,11 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
     }
   }, []);
 
-  const nextStep = useCallback((eventTimeStamp: number) => {
-    // Impede que o mesmo clique consuma duas etapas apos a re-renderizacao.
-    if (lastAdvanceEventRef.current === eventTimeStamp) return;
-    lastAdvanceEventRef.current = eventTimeStamp;
+  const nextStep = useCallback((gestureId?: number) => {
+    if (gestureId !== undefined) {
+      if (consumedNextGestureRef.current === gestureId) return;
+      consumedNextGestureRef.current = gestureId;
+    }
 
     if (stepIndex >= tourSteps.length - 1) {
       void complete(onComplete);
@@ -250,7 +253,6 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
     }
 
     setStepIndex((current) => {
-      // Bloqueia callbacks antigos caso a etapa ja tenha mudado.
       if (current !== stepIndex) return current;
       if (current >= tourSteps.length - 1) return current;
       return current + 1;
@@ -315,18 +317,27 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
       if (!target?.closest(step.interactionSelector ?? '')) return;
 
       setInteractionDone(true);
-      nextStep(event.timeStamp);
+      nextStep();
     };
 
     document.addEventListener('click', trackInteraction, true);
     return () => document.removeEventListener('click', trackInteraction, true);
   }, [active, advanceMode, nextStep, step]);
 
-  const goNext = (event: ReactMouseEvent<HTMLButtonElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
+  const beginPointerGesture = () => {
+    nextGestureRef.current += 1;
+  };
+
+  const beginKeyboardGesture = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    nextGestureRef.current += 1;
+  };
+
+  const goNext = (event?: ReactMouseEvent<HTMLButtonElement>) => {
+    event?.preventDefault();
+    event?.stopPropagation();
     if (!canContinue) return;
-    nextStep(event.timeStamp);
+    nextStep(nextGestureRef.current);
   };
 
   const goBack = (event?: ReactMouseEvent<HTMLButtonElement>) => {
@@ -371,7 +382,7 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
           {step.actionHint && <div className={interactionDone ? 'guided-tour-hint completed' : 'guided-tour-hint'}><MousePointerClick size={15} />{interactionDone ? 'Interação concluída.' : step.actionHint}</div>}
           <footer>
             <button type="button" className="skip-button" onClick={() => setShowSkipDialog(true)}>Pular tutorial</button>
-            <div>
+            <div onPointerDownCapture={beginPointerGesture} onKeyDownCapture={beginKeyboardGesture}>
               <Button type="button" variant="secondary" icon={<ArrowLeft size={16} />} onClick={goBack} disabled={isFirst || isSaving}>Voltar</Button>
               <Button type="button" icon={isLast ? <CheckCircle2 size={16} /> : <ArrowRight size={16} />} onClick={goNext} disabled={!canContinue || isSaving} loading={isSaving}>
                 {isLast ? 'Finalizar' : 'Próximo'}
