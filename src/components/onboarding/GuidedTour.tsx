@@ -205,23 +205,44 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
   const [stepIndex, setStepIndex] = useState(0);
   const [highlight, setHighlight] = useState<HighlightRect>();
   const [interactionDone, setInteractionDone] = useState(false);
+  const [targetMissing, setTargetMissing] = useState(false);
+  const [isChangingStep, setIsChangingStep] = useState(false);
   const [showSkipDialog, setShowSkipDialog] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const lastNavigationAtRef = useRef(0);
-  const missingTargetAttemptsRef = useRef(0);
+  const navigationLockedRef = useRef(false);
+  const navigationTimerRef = useRef<number | undefined>(undefined);
+  const onNavigateRef = useRef(onNavigate);
+  const onPrepareStepRef = useRef(onPrepareStep);
   const step = tourSteps[stepIndex];
   const Icon = stepIcons[stepIndex] ?? Sparkles;
   const isFirst = stepIndex === 0;
   const isLast = stepIndex === tourSteps.length - 1;
   const mustInteract = Boolean(step.interactionSelector);
-  const canContinue = !mustInteract || interactionDone;
+  const canContinue = (!mustInteract || interactionDone || targetMissing) && !isChangingStep;
+
+  useEffect(() => {
+    onNavigateRef.current = onNavigate;
+    onPrepareStepRef.current = onPrepareStep;
+  }, [onNavigate, onPrepareStep]);
 
   const canNavigateTour = () => {
+    if (navigationLockedRef.current) return false;
+
     const now = window.performance.now();
     if (now - lastNavigationAtRef.current < 500) return false;
 
     lastNavigationAtRef.current = now;
+    navigationLockedRef.current = true;
+    setIsChangingStep(true);
+
+    if (navigationTimerRef.current) window.clearTimeout(navigationTimerRef.current);
+    navigationTimerRef.current = window.setTimeout(() => {
+      navigationLockedRef.current = false;
+      setIsChangingStep(false);
+    }, 520);
+
     return true;
   };
 
@@ -230,27 +251,33 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
 
     if (!target) {
       setHighlight(undefined);
-      missingTargetAttemptsRef.current += 1;
-      if (missingTargetAttemptsRef.current >= 2) {
-        missingTargetAttemptsRef.current = 0;
-        setStepIndex((current) => Math.min(current + 1, tourSteps.length - 1));
-      }
+      setTargetMissing(true);
       return;
     }
 
-    missingTargetAttemptsRef.current = 0;
+    setTargetMissing(false);
     target.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
     window.setTimeout(() => setHighlight(getHighlightRect(target)), 180);
   }, [step.target]);
 
   useEffect(() => {
     if (!active) return;
-    onPrepareStep?.(step.id, step.view);
-    onNavigate(step.view);
+    onPrepareStepRef.current?.(step.id, step.view);
+    onNavigateRef.current(step.view);
     setInteractionDone(false);
-    const timer = window.setTimeout(refreshHighlight, 260);
-    return () => window.clearTimeout(timer);
-  }, [active, onNavigate, onPrepareStep, refreshHighlight, step.id, step.view]);
+    setTargetMissing(false);
+    setHighlight(undefined);
+
+    const timers = [180, 460, 820].map((delay) => window.setTimeout(refreshHighlight, delay));
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [active, refreshHighlight, step.id, step.view]);
+
+  useEffect(() => {
+    return () => {
+      if (!navigationTimerRef.current) return;
+      window.clearTimeout(navigationTimerRef.current);
+    };
+  }, []);
 
   useLayoutEffect(() => {
     if (!active) return;
@@ -312,7 +339,10 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
     setStepIndex((current) => Math.max(current - 1, 0));
   };
 
-  const cardPosition = useMemo(() => getCardPosition(highlight, step.placement ?? 'bottom'), [highlight, step.placement]);
+  const cardPosition = useMemo(
+    () => getCardPosition(highlight, targetMissing ? 'center' : step.placement ?? 'bottom'),
+    [highlight, step.placement, targetMissing],
+  );
   const progress = Math.round(((stepIndex + 1) / tourSteps.length) * 100);
 
   if (!active) return null;
@@ -326,7 +356,7 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
             style={{ top: highlight.top, left: highlight.left, width: highlight.width, height: highlight.height }}
           />
         )}
-        {highlight && <section
+        {(highlight || targetMissing) && <section
           className={`guided-tour-card guided-tour-card--${cardPosition.placement}`}
           style={{ top: cardPosition.top, left: cardPosition.left }}
           role="dialog"
@@ -340,13 +370,13 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
           <div className="guided-tour-progress" aria-hidden="true"><span style={{ width: `${progress}%` }} /></div>
           <small>Etapa {stepIndex + 1} de {tourSteps.length}</small>
           <h2 id="guided-tour-title" ref={titleRef} tabIndex={-1}>{step.title}</h2>
-          <p>{step.description}</p>
+          <p>{targetMissing ? 'Estamos preparando este ponto da tela. Se ele não aparecer, avance manualmente para a próxima etapa.' : step.description}</p>
           {step.actionHint && <div className={interactionDone ? 'guided-tour-hint completed' : 'guided-tour-hint'}><MousePointerClick size={15} />{interactionDone ? 'Interação concluída.' : step.actionHint}</div>}
           <footer>
             <button type="button" className="skip-button" onClick={() => setShowSkipDialog(true)}>Pular tutorial</button>
             <div>
-              <Button type="button" variant="secondary" icon={<ArrowLeft size={16} />} onClick={goBack} disabled={isFirst || isSaving}>Voltar</Button>
-              <Button type="button" icon={isLast ? <CheckCircle2 size={16} /> : <ArrowRight size={16} />} onClick={goNext} disabled={!canContinue || isSaving} loading={isSaving}>
+              <Button type="button" variant="secondary" icon={<ArrowLeft size={16} />} onClick={goBack} disabled={isFirst || isSaving || isChangingStep}>Voltar</Button>
+              <Button type="button" icon={isLast ? <CheckCircle2 size={16} /> : <ArrowRight size={16} />} onClick={goNext} disabled={!canContinue || isSaving || isChangingStep} loading={isSaving}>
                 {isLast ? 'Finalizar' : 'Próximo'}
               </Button>
             </div>
