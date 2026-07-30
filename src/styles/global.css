@@ -2115,3 +2115,61 @@ h1,h2,h3,p { margin-top: 0; }
     font-size:13px!important;
   }
 }
+
+/* Bigger progress distribution chart */
+.mastery-chart{
+  gap:22px!important;
+  padding:28px 10px 24px!important;
+}
+
+.mastery-chart>div{
+  grid-template-columns:112px minmax(0,1fr) 42px!important;
+  gap:18px!important;
+  font-size:15px!important;
+  line-height:1.4!important;
+}
+
+.mastery-chart>div>span{
+  font-size:15px!important;
+  font-weight:650!important;
+  color:#62687d!important;
+}
+
+.mastery-chart>div>div{
+  height:14px!important;
+  border-radius:999px!important;
+}
+
+.mastery-chart strong{
+  font-size:15px!important;
+  font-weight:800!important;
+  color:#20243a!important;
+}
+
+.chart-summary{
+  margin-top:22px!important;
+  font-size:15px!important;
+}
+
+@media(max-width:640px){
+  .mastery-chart{
+    gap:18px!important;
+    padding:22px 2px 18px!important;
+  }
+
+  .mastery-chart>div{
+    grid-template-columns:92px minmax(0,1fr) 34px!important;
+    gap:12px!important;
+  }
+
+  .mastery-chart>div,
+  .mastery-chart>div>span,
+  .mastery-chart strong,
+  .chart-summary{
+    font-size:13px!important;
+  }
+
+  .mastery-chart>div>div{
+    height:12px!important;
+  }
+}
