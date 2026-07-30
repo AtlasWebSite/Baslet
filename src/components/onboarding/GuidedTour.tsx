@@ -214,7 +214,7 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
   const [showSkipDialog, setShowSkipDialog] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const titleRef = useRef<HTMLHeadingElement>(null);
-  const advancedStepRef = useRef<number | null>(null);
+  const advancingRef = useRef(false);
   const onNavigateRef = useRef(onNavigate);
   const onPrepareStepRef = useRef(onPrepareStep);
   const step = tourSteps[stepIndex];
@@ -231,7 +231,7 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
   }, [onNavigate, onPrepareStep]);
 
   useEffect(() => {
-    advancedStepRef.current = null;
+    advancingRef.current = false;
   }, [stepIndex]);
 
   const complete = useCallback(async (callback: () => Promise<void> | void) => {
@@ -244,9 +244,9 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
   }, []);
 
   const advanceTour = useCallback(() => {
-    if (advancedStepRef.current === stepIndex) return;
+    if (advancingRef.current) return;
 
-    advancedStepRef.current = stepIndex;
+    advancingRef.current = true;
 
     if (stepIndex >= tourSteps.length - 1) {
       void complete(onComplete);
@@ -263,7 +263,7 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
   const retreatTour = useCallback(() => {
     if (stepIndex <= 0) return;
 
-    advancedStepRef.current = null;
+    advancingRef.current = false;
     setStepIndex((current) => {
       if (current !== stepIndex) return current;
       return Math.max(current - 1, 0);

@@ -15,7 +15,7 @@ import {
   Target,
   Trophy,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode, type RefObject } from 'react';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
 import { Logo } from '../logo/Logo';
@@ -98,7 +98,7 @@ export function OnboardingFlow({ onComplete, onBypass }: OnboardingFlowProps) {
   const [error, setError] = useState('');
   const titleRef = useRef<HTMLHeadingElement>(null);
   const dialogRef = useRef<HTMLElement>(null);
-  const advancedStepRef = useRef<number | null>(null);
+  const advancingRef = useRef(false);
   const currentQuestion = questions[step];
   const selectedOptionId = currentQuestion ? answers[currentQuestion.id] : undefined;
   const progress = showCompletion ? 100 : Math.round(((step + 1) / questions.length) * 100);
@@ -114,7 +114,7 @@ export function OnboardingFlow({ onComplete, onBypass }: OnboardingFlowProps) {
 
   useEffect(() => {
     titleRef.current?.focus();
-    advancedStepRef.current = null;
+    advancingRef.current = false;
   }, [step, showCompletion]);
 
   useEffect(() => () => setAnswers({}), []);
@@ -151,9 +151,9 @@ export function OnboardingFlow({ onComplete, onBypass }: OnboardingFlowProps) {
 
   const advanceOnboarding = () => {
     if (!currentQuestion || !selectedOptionId) return;
-    if (advancedStepRef.current === step) return;
+    if (advancingRef.current) return;
 
-    advancedStepRef.current = step;
+    advancingRef.current = true;
 
     if (step === questions.length - 1) {
       setShowCompletion(true);
@@ -167,8 +167,14 @@ export function OnboardingFlow({ onComplete, onBypass }: OnboardingFlowProps) {
     advanceOnboarding();
   };
 
+  const handleContinue = (event: ReactMouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    continueFlow();
+  };
+
   const goBack = () => {
-    advancedStepRef.current = null;
+    advancingRef.current = false;
 
     if (showCompletion) {
       setShowCompletion(false);
@@ -229,7 +235,7 @@ export function OnboardingFlow({ onComplete, onBypass }: OnboardingFlowProps) {
             {showCompletion ? (
               <Button loading={saving} icon={<CheckCircle2 size={17} />} onClick={() => void complete()}>Começar a estudar</Button>
             ) : (
-              <Button icon={<ArrowRight size={17} />} onClick={continueFlow} disabled={!selectedOptionId}>Continuar</Button>
+              <Button icon={<ArrowRight size={17} />} onClick={handleContinue} disabled={!selectedOptionId}>Continuar</Button>
             )}
           </div>
         </footer>
