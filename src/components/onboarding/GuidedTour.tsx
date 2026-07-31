@@ -17,6 +17,7 @@ interface TourStep {
   actionHint?: string;
   advanceMode?: TourAdvanceMode;
   interactionSelector?: string;
+  highlightAllTargets?: boolean;
 }
 
 interface HighlightRect {
@@ -108,6 +109,7 @@ const tourSteps: TourStep[] = [
     actionHint: 'Clique em uma alternativa para continuar.',
     advanceMode: 'action',
     interactionSelector: '[data-tour="quiz-answer"]',
+    highlightAllTargets: true,
   },
   {
     id: 'quiz-progress',
@@ -153,25 +155,40 @@ const tourSteps: TourStep[] = [
 
 const stepIcons = [LayoutDashboard, Compass, Play, MousePointerClick, ArrowRight, Sparkles, HelpCircle, CheckCircle2, Eye, Map, Map, Sparkles, CheckCircle2];
 
-function getVisibleTarget(selector: string) {
-  const elements = Array.from(document.querySelectorAll<HTMLElement>(selector));
-
-  return elements.find((element) => {
+function getVisibleTargets(selector: string) {
+  return Array.from(document.querySelectorAll<HTMLElement>(selector)).filter((element) => {
     const rect = element.getBoundingClientRect();
     const style = window.getComputedStyle(element);
     return rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none';
   });
 }
 
+function getVisibleTarget(selector: string) {
+  return getVisibleTargets(selector)[0];
+}
+
 function getHighlightRect(element: HTMLElement): HighlightRect {
-  const rect = element.getBoundingClientRect();
+  return getHighlightRectForElements([element]);
+}
+
+function getHighlightRectForElements(elements: HTMLElement[]): HighlightRect {
   const padding = 10;
+  const rects = elements.map((element) => element.getBoundingClientRect());
+  const top = Math.min(...rects.map((rect) => rect.top));
+  const left = Math.min(...rects.map((rect) => rect.left));
+  const right = Math.max(...rects.map((rect) => rect.right));
+  const bottom = Math.max(...rects.map((rect) => rect.bottom));
+
+  const boundedTop = Math.max(8, top - padding);
+  const boundedLeft = Math.max(8, left - padding);
+  const boundedRight = Math.min(window.innerWidth - 8, right + padding);
+  const boundedBottom = Math.min(window.innerHeight - 8, bottom + padding);
 
   return {
-    top: Math.max(8, rect.top - padding),
-    left: Math.max(8, rect.left - padding),
-    width: Math.min(window.innerWidth - 16, rect.width + padding * 2),
-    height: Math.min(window.innerHeight - 16, rect.height + padding * 2),
+    top: boundedTop,
+    left: boundedLeft,
+    width: Math.max(0, boundedRight - boundedLeft),
+    height: Math.max(0, boundedBottom - boundedTop),
   };
 }
 
@@ -303,22 +320,36 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
 
   const refreshHighlight = useCallback(() => {
     const stepId = step.id;
-    const target = getVisibleTarget(step.target);
+    const targets = step.highlightAllTargets
+      ? getVisibleTargets(step.target)
+      : [getVisibleTarget(step.target)].filter((target): target is HTMLElement => Boolean(target));
 
-    if (!target) {
+    if (!targets.length) {
       if (activeStepIdRef.current === stepId) setHighlight(undefined);
       return;
     }
 
-    target.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
+    // Na etapa do quiz, todas as alternativas ficam dentro da área destacada
+    // para que o usuário possa visualizar e escolher qualquer resposta.
+    targets[0].scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
 
     window.setTimeout(() => {
       // Um timeout iniciado por uma etapa antiga nunca pode atualizar a etapa atual.
       if (activeStepIdRef.current !== stepId) return;
-      if (!target.isConnected) return;
-      setHighlight(getHighlightRect(target));
+
+      const currentTargets = step.highlightAllTargets
+        ? getVisibleTargets(step.target)
+        : targets.filter((target) => target.isConnected);
+
+      if (!currentTargets.length) return;
+
+      setHighlight(
+        step.highlightAllTargets
+          ? getHighlightRectForElements(currentTargets)
+          : getHighlightRect(currentTargets[0]),
+      );
     }, 180);
-  }, [step.id, step.target]);
+  }, [step.highlightAllTargets, step.id, step.target]);
 
   useEffect(() => {
     if (!active) return;
