@@ -144,7 +144,7 @@ export async function getStudySets(user: SessionUser) {
     sql`select * from study_progress where user_id = ${user.id}`,
   ]);
 
-  const progressByCard = new Map(progressResult.rows.map((progress) => [String(progress.flashcard_id), String(progress.status)]));
+  const progressByCard = new Map(progressResult.rows.map((progress) => [String(progress.flashcard_id), progress]));
   const cardsBySet = new Map<string, Array<Record<string, unknown>>>();
 
   for (const card of cardsResult.rows) {
@@ -164,7 +164,9 @@ export async function getStudySets(user: SessionUser) {
       id: String(card.id),
       term: String(card.term),
       definition: String(card.definition),
-      mastery: toMastery(progressByCard.get(String(card.id))),
+      mastery: toMastery(progressByCard.get(String(card.id)) ? String(progressByCard.get(String(card.id))?.status) : undefined),
+      timesSeen: Number(progressByCard.get(String(card.id))?.times_seen ?? 0),
+      lastReviewedAt: progressByCard.get(String(card.id))?.last_reviewed_at ? new Date(String(progressByCard.get(String(card.id))?.last_reviewed_at)).toISOString() : null,
     })),
   }));
 }

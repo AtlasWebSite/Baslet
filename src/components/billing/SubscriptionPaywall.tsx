@@ -5,11 +5,11 @@ import { PricingCard } from './PricingCard';
 import { Button } from '../ui/Button';
 
 const messages = {
-  pending: { title: 'Pagamento em análise', text: 'O Mercado Pago ainda está processando sua assinatura. O acesso será liberado automaticamente após a confirmação.' },
+  pending: { title: 'Pagamento sendo confirmado', text: 'Seu pagamento foi recebido e está sendo processado pelo Mercado Pago.' },
   rejected: { title: 'Pagamento não aprovado', text: 'A cobrança não foi aprovada. Você pode iniciar uma nova tentativa com segurança.' },
   paused: { title: 'Assinatura pausada', text: 'Seu acesso Premium está pausado. Reative o plano para continuar estudando.' },
   cancelled: { title: 'Assinatura cancelada', text: 'Sua assinatura não está mais ativa. Você pode assinar novamente quando quiser.' },
-  inactive: { title: 'Desbloqueie seus estudos', text: 'Use flashcards, mapas mentais, testes e progresso por apenas R$ 11,90 por mês.' },
+  inactive: { title: 'Desbloqueie seus estudos', text: 'Estude menos tempo, lembre por mais tempo e acompanhe sua evolução em um só lugar.' },
 };
 
 interface SubscriptionPaywallProps {
@@ -36,13 +36,14 @@ export function SubscriptionPaywall({
   const status = subscription?.status === 'active' ? 'inactive' : subscription?.status ?? 'inactive';
   const message = messages[status];
   const pending = status === 'pending';
-  const actionLabel = pending
-    ? 'Pagar novamente'
-    : status === 'rejected'
+  const actionLabel = status === 'rejected'
       ? 'Tentar novamente'
       : status === 'cancelled' || status === 'paused'
         ? 'Reativar Premium'
-        : 'Assinar agora';
+        : 'Começar Premium';
+  const pricingAction = pending
+    ? <BillingButton loading={isRefreshing} onClick={onRefresh}>Verificar status</BillingButton>
+    : <BillingButton loading={isStarting} onClick={onSubscribe}>{actionLabel}</BillingButton>;
 
   return (
     <div className="subscription-page">
@@ -54,8 +55,8 @@ export function SubscriptionPaywall({
         <h1>{message.title}</h1>
         <p>{message.text}</p>
         {errorMessage && <div className="billing-error" role="alert">{errorMessage}</div>}
-        <PricingCard action={<BillingButton loading={isStarting} onClick={onSubscribe}>{actionLabel}</BillingButton>} />
-        {pending && <Button variant="secondary" icon={<RefreshCw size={16} />} loading={isRefreshing} onClick={onRefresh}>Verificar pagamento novamente</Button>}
+        <PricingCard action={pricingAction} />
+        {!pending && ['rejected', 'cancelled', 'paused'].includes(status) && <Button variant="secondary" icon={<RefreshCw size={16} />} loading={isRefreshing} onClick={onRefresh}>Verificar status</Button>}
         {showSignOut && <button className="billing-signout" onClick={onSignOut}><LogOut size={15} /> Sair da conta</button>}
       </section>
     </div>

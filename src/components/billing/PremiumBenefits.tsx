@@ -1,12 +1,11 @@
-import { BarChart3, BookOpen, Brain, Cloud, Network, Sparkles } from 'lucide-react';
+import { BarChart3, BookOpen, Cloud, Network, SearchCheck } from 'lucide-react';
 
 const benefits = [
-  { icon: BookOpen, label: 'Flashcards ilimitados' },
-  { icon: Network, label: 'Mapas mentais automáticos' },
-  { icon: Brain, label: 'Testes de revisão' },
-  { icon: BarChart3, label: 'Progresso salvo na conta' },
-  { icon: Cloud, label: 'Acesso em qualquer dispositivo' },
-  { icon: Sparkles, label: 'Conteúdo organizado por matérias' },
+  { icon: BookOpen, label: 'Transforme qualquer assunto em flashcards' },
+  { icon: SearchCheck, label: 'Descubra rapidamente o que ainda precisa revisar' },
+  { icon: Network, label: 'Visualize assuntos complexos com mapas mentais' },
+  { icon: BarChart3, label: 'Acompanhe sua evolução' },
+  { icon: Cloud, label: 'Estude de qualquer dispositivo' },
 ];
 
 export function PremiumBenefits() {

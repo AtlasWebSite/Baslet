@@ -5,6 +5,8 @@ export interface Flashcard {
   term: string;
   definition: string;
   mastery: 0 | 1 | 2 | 3;
+  timesSeen?: number;
+  lastReviewedAt?: string | null;
 }
 
 export interface StudySet {

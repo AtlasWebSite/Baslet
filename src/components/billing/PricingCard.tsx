@@ -8,7 +8,11 @@ export function PricingCard({ action }: { action: ReactNode }) {
       <div className="pricing-card__glow" />
       <header>
         <span><Crown size={22} /></span>
-        <div><small>PLANO MENSAL</small><h2>StudyFlow Premium</h2></div>
+        <div>
+          <small>PLANO MENSAL</small>
+          <h2>StudyFlow Premium</h2>
+          <p>Estude menos tempo. Lembre por mais tempo.</p>
+        </div>
       </header>
       <div className="pricing-card__price"><strong><sup>R$</sup>11,90</strong><span>por mês</span></div>
       <PremiumBenefits />

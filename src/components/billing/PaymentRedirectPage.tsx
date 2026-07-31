@@ -76,7 +76,11 @@ export function PaymentRedirectPage({
       );
     }
 
-    return <BillingButton loading={isStarting} onClick={() => onSubscribe?.()}>{isPending ? 'Pagar novamente' : 'Ir para pagamento'}</BillingButton>;
+    if (isPending) {
+      return <BillingButton loading={isRefreshing} onClick={() => onRefresh?.()}>Verificar status</BillingButton>;
+    }
+
+    return <BillingButton loading={isStarting} onClick={() => onSubscribe?.()}>Começar Premium</BillingButton>;
   })();
 
   return (
@@ -94,7 +98,7 @@ export function PaymentRedirectPage({
             <span className="subscription-hero__badge"><Sparkles size={14} /> STUDYFLOW PREMIUM</span>
             <h1>Finalize sua assinatura e desbloqueie seus estudos.</h1>
             <p>
-              Assine por R$ 11,90 ao mês para usar flashcards, mapas mentais, testes e progresso salvo na sua conta.
+              Estude menos tempo. Lembre por mais tempo. Comece o Premium por R$ 11,90 ao mês.
             </p>
 
             <div className="payment-redirect-steps" aria-label="Etapas do pagamento">
@@ -117,7 +121,7 @@ export function PaymentRedirectPage({
             )}
             {(errorMessage || loginError) && <div className="billing-error" role="alert">{errorMessage || loginError}</div>}
             <PricingCard action={action} />
-            {mode === 'checkout' && (
+            {mode === 'checkout' && !isPending && (
               <Button variant="secondary" icon={<CreditCard size={16} />} loading={isRefreshing} onClick={onRefresh}>
                 Verificar assinatura
               </Button>

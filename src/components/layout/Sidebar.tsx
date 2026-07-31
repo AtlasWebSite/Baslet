@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { BrainCircuit, CreditCard, Crown, UserRound } from 'lucide-react';
+import { CreditCard, Crown, UserRound } from 'lucide-react';
 import type { Profile, ViewId } from '../../types';
 import type { Subscription, SubscriptionStatus } from '../../types/subscription';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
 import { Logo } from '../logo/Logo';
-import { navigationItems } from './navigation';
+import { sidebarFooterItems, sidebarPerformanceItems, sidebarPrimaryItem, sidebarStudyItems } from './navigation';
+import type { NavigationItem } from './navigation';
 
 const subscriptionStatusLabels: Record<SubscriptionStatus | 'inactive', string> = {
   inactive: 'Assinatura inativa',
@@ -71,20 +72,55 @@ export function Sidebar({ activeView, onNavigate, onBilling, profile, subscripti
     window.dispatchEvent(new Event('studyflow:open-premium'));
   };
 
+  const openBillingFromSidebar = () => {
+    if (onBilling) {
+      onBilling();
+      return;
+    }
+
+    onNavigate('billing');
+  };
+
+  const renderNavigationButton = ({ id, label, icon: Icon }: NavigationItem) => {
+    const isActive = activeView === id;
+    const handleClick = () => {
+      if (id === 'profile') {
+        setProfileOpen(true);
+        return;
+      }
+
+      if (id === 'billing') {
+        openBillingFromSidebar();
+        return;
+      }
+
+      onNavigate(id);
+    };
+
+    return (
+      <button key={id} className={isActive ? 'nav-item active' : 'nav-item'} data-tour={`nav-${id}`} onClick={handleClick}>
+        <Icon size={20} /><span>{label}</span>
+      </button>
+    );
+  };
+
   return (
     <>
       <aside className="sidebar" data-tour="main-navigation">
         <button className="brand" onClick={() => onNavigate('home')} aria-label="Ir para o início"><Logo /></button>
         <nav aria-label="Navegação principal">
-          {navigationItems.map(({ id, label, icon: Icon }) => (
-            <button key={id} className={activeView === id ? 'nav-item active' : 'nav-item'} data-tour={`nav-${id}`} onClick={() => onNavigate(id)}>
-              <Icon size={20} /><span>{label}</span>
-            </button>
-          ))}
+          {renderNavigationButton(sidebarPrimaryItem)}
+          <div className="sidebar-nav-section" aria-label="Estudos">
+            <span>ESTUDOS</span>
+            {sidebarStudyItems.map(renderNavigationButton)}
+          </div>
+          <div className="sidebar-nav-section" aria-label="Desempenho">
+            <span>DESEMPENHO</span>
+            {sidebarPerformanceItems.map(renderNavigationButton)}
+          </div>
         </nav>
-        <div className="sidebar-tip sidebar-tip--empty">
-          <span className="sidebar-tip__icon"><BrainCircuit size={20} /></span>
-          <strong>Seu ritmo começa aqui</strong><p>Crie conjuntos e estude um pouco por dia para construir sua evolução.</p>
+        <div className="sidebar-bottom-actions" aria-label="Conta e plano">
+          {sidebarFooterItems.map(renderNavigationButton)}
         </div>
         <button type="button" className="sidebar-user" onClick={() => setProfileOpen(true)} aria-label="Abrir perfil do usuário">
           {profile.avatar_url ? <img src={profile.avatar_url} alt="" referrerPolicy="no-referrer" /> : <span>{name.slice(0, 2).toUpperCase()}</span>}

@@ -2,10 +2,12 @@ import {
   BarChart3,
   BookOpenCheck,
   BrainCircuit,
+  CalendarDays,
   Flame,
   Layers3,
   RotateCcw,
   Target,
+  Timer,
   TrendingUp,
 } from 'lucide-react';
 import type { CSSProperties } from 'react';
@@ -15,7 +17,8 @@ import { ProgressBar } from '../components/ui/ProgressBar';
 import type { StudySet } from '../types';
 import { getOverallProgress, getSetProgress } from '../utils/study';
 
-const masteryLabels = ['Novos', 'Aprendendo', 'Quase lá', 'Dominados'];
+const masteryLabels = ['Esquecidos', 'Ainda aprendendo', 'Próximos da revisão', 'Dominados'];
+const weekLabels = ['SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB', 'DOM'];
 
 function groupSubjects(studySets: StudySet[]) {
   const subjects = new Map<string, { color: string; cards: number; progressSum: number; sets: number }>();
@@ -52,14 +55,84 @@ function groupSubjects(studySets: StudySet[]) {
     .sort((first, second) => second.cards - first.cards);
 }
 
+function getMonday(date: Date) {
+  const copy = new Date(date);
+  const day = copy.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  copy.setHours(0, 0, 0, 0);
+  copy.setDate(copy.getDate() + diff);
+  return copy;
+}
+
+function getWeekActivity(cards: StudySet['cards']) {
+  const monday = getMonday(new Date());
+
+  return weekLabels.map((label, index) => {
+    const currentDay = new Date(monday);
+    currentDay.setDate(monday.getDate() + index);
+    const activityCount = cards.filter((card) => {
+      if (!card.lastReviewedAt) return false;
+      const reviewedAt = new Date(card.lastReviewedAt);
+      return reviewedAt.toDateString() === currentDay.toDateString();
+    }).length;
+
+    return { label, activityCount };
+  });
+}
+
+function getDomainTimeline(cards: StudySet['cards']) {
+  const points = new Map<string, { label: string; timestamp: number; totalMastery: number; totalCards: number }>();
+
+  cards.forEach((card) => {
+    if (!card.lastReviewedAt) return;
+
+    const reviewedAt = new Date(card.lastReviewedAt);
+    if (Number.isNaN(reviewedAt.getTime())) return;
+
+    const weekStart = getMonday(reviewedAt);
+    const key = weekStart.toISOString();
+    const label = `Semana de ${weekStart.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`;
+    const current = points.get(key);
+
+    if (!current) {
+      points.set(key, {
+        label,
+        timestamp: weekStart.getTime(),
+        totalMastery: card.mastery,
+        totalCards: 1,
+      });
+      return;
+    }
+
+    points.set(key, {
+      ...current,
+      totalMastery: current.totalMastery + card.mastery,
+      totalCards: current.totalCards + 1,
+    });
+  });
+
+  return [...points.values()]
+    .sort((firstPoint, secondPoint) => firstPoint.timestamp - secondPoint.timestamp)
+    .map((point) => ({
+      label: point.label,
+      progress: Math.round((point.totalMastery / (point.totalCards * 3)) * 100),
+    }));
+}
+
 export function ProgressView({ studySets }: { studySets: StudySet[] }) {
   const cards = studySets.flatMap((studySet) => studySet.cards);
   const mastered = cards.filter((card) => card.mastery === 3).length;
   const practiced = cards.filter((card) => card.mastery > 0).length;
-  const review = cards.filter((card) => card.mastery < 2).length;
+  const forgotten = cards.filter((card) => card.mastery === 0).length;
+  const learning = cards.filter((card) => card.mastery === 1).length;
+  const almost = cards.filter((card) => card.mastery === 2).length;
+  const review = forgotten + learning + almost;
+  const reviewedCards = cards.filter((card) => (card.timesSeen ?? 0) > 0);
   const overall = getOverallProgress(studySets);
   const masteryCounts = [0, 1, 2, 3].map((level) => cards.filter((card) => card.mastery === level).length);
   const subjects = groupSubjects(studySets);
+  const weekActivity = getWeekActivity(cards);
+  const domainTimeline = getDomainTimeline(cards);
   const rankedSets = [...studySets].sort((first, second) => getSetProgress(second) - getSetProgress(first));
   const focusSets = [...studySets]
     .filter((studySet) => studySet.cards.some((card) => card.mastery < 2))
@@ -83,7 +156,7 @@ export function ProgressView({ studySets }: { studySets: StudySet[] }) {
       <div className="stats-grid">
         <StatCard icon={<Target size={23} />} value={`${overall}%`} label="Domínio geral" detail="Baseado nas suas respostas" tone="purple" />
         <StatCard icon={<BookOpenCheck size={23} />} value={mastered} label="Cards dominados" detail={`de ${cards.length} cards`} tone="cyan" />
-        <StatCard icon={<RotateCcw size={23} />} value={review} label="Para revisar" detail="Revisão recomendada" tone="orange" />
+        <StatCard icon={<RotateCcw size={23} />} value={review} label="cards para revisar" detail={`${forgotten} esquecidos · ${learning} ainda aprendendo · ${almost} próximos da revisão`} tone="orange" />
         <StatCard icon={<Flame size={23} />} value={practiced} label="Cards praticados" detail="Com progresso salvo" tone="pink" />
       </div>
 
@@ -112,6 +185,31 @@ export function ProgressView({ studySets }: { studySets: StudySet[] }) {
           </div>
         </section>
 
+        <section className="chart-card activity-card">
+          <div className="section-heading">
+            <div>
+              <span className="eyebrow">ATIVIDADE</span>
+              <h2>Últimos 7 dias</h2>
+            </div>
+            <CalendarDays size={21} />
+          </div>
+          <div className="weekly-activity" aria-label="Atividade dos últimos 7 dias">
+            {weekActivity.map((day) => (
+              <div key={day.label} className={day.activityCount ? 'active' : ''}>
+                <span>{day.label}</span>
+                <strong>{day.activityCount}</strong>
+              </div>
+            ))}
+          </div>
+          <div className="activity-summary">
+            <div><strong>{reviewedCards.length}</strong><span>Cards revisados</span></div>
+            <div><strong>{mastered}</strong><span>Cards dominados</span></div>
+            <div><strong>—</strong><span>Minutos estudados</span><small>Tempo ainda não registrado</small></div>
+          </div>
+        </section>
+      </div>
+
+      <div className="progress-dashboard-grid">
         <section className="chart-card">
           <div className="section-heading">
             <div>
@@ -128,6 +226,33 @@ export function ProgressView({ studySets }: { studySets: StudySet[] }) {
               </div>
             ))}
           </div>
+        </section>
+
+        <section className="chart-card domain-timeline-card">
+          <div className="section-heading">
+            <div>
+              <span className="eyebrow">EVOLUÇÃO</span>
+              <h2>Evolução do domínio</h2>
+            </div>
+            <TrendingUp size={21} />
+          </div>
+          {domainTimeline.length ? (
+            <div className="domain-timeline">
+              {domainTimeline.map((point) => (
+                <div key={point.label}>
+                  <span>{point.label}</span>
+                  <div><i style={{ width: `${point.progress}%` }} /></div>
+                  <strong>{point.progress}%</strong>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="progress-empty-note">
+              <Timer size={22} />
+              <strong>Histórico temporal ainda não disponível</strong>
+              <span>Depois das próximas revisões, a evolução por semana aparecerá aqui.</span>
+            </div>
+          )}
         </section>
       </div>
 
