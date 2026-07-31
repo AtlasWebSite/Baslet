@@ -155,16 +155,83 @@ const tourSteps: TourStep[] = [
 
 const stepIcons = [LayoutDashboard, Compass, Play, MousePointerClick, ArrowRight, Sparkles, HelpCircle, CheckCircle2, Eye, Map, Map, Sparkles, CheckCircle2];
 
+function isVisibleElement(element: HTMLElement) {
+  const rect = element.getBoundingClientRect();
+  const style = window.getComputedStyle(element);
+  return rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none';
+}
+
 function getVisibleTargets(selector: string) {
-  return Array.from(document.querySelectorAll<HTMLElement>(selector)).filter((element) => {
-    const rect = element.getBoundingClientRect();
-    const style = window.getComputedStyle(element);
-    return rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none';
-  });
+  return Array.from(document.querySelectorAll<HTMLElement>(selector)).filter(isVisibleElement);
 }
 
 function getVisibleTarget(selector: string) {
   return getVisibleTargets(selector)[0];
+}
+
+function uniqueElements(elements: HTMLElement[]) {
+  return Array.from(new Set(elements));
+}
+
+/**
+ * A etapa 8 precisa permitir que o usuário escolha qualquer alternativa.
+ * Em algumas telas apenas a alternativa A recebe data-tour="quiz-answer".
+ * Nesse caso usamos A como âncora e encontramos os botões irmãos com o
+ * mesmo tamanho/alinhamento, normalmente A, B, C e D.
+ */
+function getQuizAnswerTargets(selector: string) {
+  const explicitTargets = getVisibleTargets(selector);
+  if (!explicitTargets.length) return [];
+
+  const explicitButtons = uniqueElements(
+    explicitTargets.map((element) => element.closest<HTMLElement>('button, [role="button"]') ?? element),
+  ).filter(isVisibleElement);
+
+  if (explicitButtons.length > 1) return explicitButtons;
+
+  const anchor = explicitButtons[0];
+  if (!anchor) return explicitTargets;
+
+  const anchorRect = anchor.getBoundingClientRect();
+  let container = anchor.parentElement;
+
+  for (let depth = 0; depth < 5 && container; depth += 1) {
+    const candidates = Array.from(container.querySelectorAll<HTMLElement>('button, [role="button"]'))
+      .filter(isVisibleElement)
+      .filter((element) => !element.closest('.guided-tour-card, .modal'))
+      .filter((element) => {
+        const rect = element.getBoundingClientRect();
+        const leftTolerance = Math.max(24, anchorRect.width * 0.08);
+        const sameColumn = Math.abs(rect.left - anchorRect.left) <= leftTolerance;
+        const similarWidth = rect.width >= anchorRect.width * 0.82 && rect.width <= anchorRect.width * 1.18;
+        const similarHeight = rect.height >= anchorRect.height * 0.55 && rect.height <= anchorRect.height * 1.8;
+
+        return sameColumn && similarWidth && similarHeight;
+      });
+
+    // Um quiz normal tem de 2 a 6 alternativas. Isso evita capturar botões
+    // de navegação como “Próxima questão” quando subimos demais no DOM.
+    if (candidates.length >= 2 && candidates.length <= 6) {
+      return candidates;
+    }
+
+    container = container.parentElement;
+  }
+
+  return explicitButtons;
+}
+
+function getTargetsForStep(step: TourStep) {
+  if (step.id === 'answer-quiz') {
+    return getQuizAnswerTargets(step.target);
+  }
+
+  if (step.highlightAllTargets) {
+    return getVisibleTargets(step.target);
+  }
+
+  const target = getVisibleTarget(step.target);
+  return target ? [target] : [];
 }
 
 function getHighlightRect(element: HTMLElement): HighlightRect {
@@ -320,36 +387,31 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
 
   const refreshHighlight = useCallback(() => {
     const stepId = step.id;
-    const targets = step.highlightAllTargets
-      ? getVisibleTargets(step.target)
-      : [getVisibleTarget(step.target)].filter((target): target is HTMLElement => Boolean(target));
+    const targets = getTargetsForStep(step);
 
     if (!targets.length) {
       if (activeStepIdRef.current === stepId) setHighlight(undefined);
       return;
     }
 
-    // Na etapa do quiz, todas as alternativas ficam dentro da área destacada
-    // para que o usuário possa visualizar e escolher qualquer resposta.
     targets[0].scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
 
     window.setTimeout(() => {
       // Um timeout iniciado por uma etapa antiga nunca pode atualizar a etapa atual.
       if (activeStepIdRef.current !== stepId) return;
 
-      const currentTargets = step.highlightAllTargets
-        ? getVisibleTargets(step.target)
-        : targets.filter((target) => target.isConnected);
-
+      const currentTargets = getTargetsForStep(step).filter((target) => target.isConnected);
       if (!currentTargets.length) return;
 
+      // Na etapa 8 o retângulo envolve todas as alternativas encontradas.
+      const shouldGroupTargets = step.id === 'answer-quiz' || step.highlightAllTargets;
       setHighlight(
-        step.highlightAllTargets
+        shouldGroupTargets
           ? getHighlightRectForElements(currentTargets)
           : getHighlightRect(currentTargets[0]),
       );
     }, 180);
-  }, [step.highlightAllTargets, step.id, step.target]);
+  }, [step]);
 
   useEffect(() => {
     if (!active) return;
@@ -381,8 +443,16 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
 
     const trackInteraction = (event: MouseEvent) => {
       const target = event.target as HTMLElement | null;
-      if (target?.closest('.guided-tour-card, .modal')) return;
-      if (!target?.closest(step.interactionSelector ?? '')) return;
+      if (!target) return;
+      if (target.closest('.guided-tour-card, .modal')) return;
+
+      if (step.id === 'answer-quiz') {
+        const quizAnswers = getQuizAnswerTargets(step.interactionSelector);
+        const clickedAnswer = quizAnswers.some((answer) => answer === target || answer.contains(target));
+        if (!clickedAnswer) return;
+      } else if (!target.closest(step.interactionSelector)) {
+        return;
+      }
 
       setInteractionDone(true);
       nextStep();
