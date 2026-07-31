@@ -538,7 +538,11 @@ async function handleAccount(request: VercelRequest, response: VercelResponse) {
     const subscription = await getSubscription(user);
 
     if (subscription?.mercadoPagoPreapprovalId && process.env.MERCADO_PAGO_ACCESS_TOKEN) {
-      await cancelMercadoPagoSubscription(subscription.mercadoPagoPreapprovalId);
+      try {
+        await cancelMercadoPagoSubscription(subscription.mercadoPagoPreapprovalId);
+      } catch (error) {
+        console.error('Não foi possível cancelar a assinatura no Mercado Pago antes de apagar a conta:', error);
+      }
     }
 
     await deleteUserAccount(user);
