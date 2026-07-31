@@ -441,16 +441,20 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
   useEffect(() => {
     if (!active || advanceMode !== 'action' || !step.interactionSelector) return;
 
+    // Salva o seletor em uma constante local após a validação.
+    // Assim o TypeScript sabe que ele é sempre `string` dentro do callback.
+    const interactionSelector = step.interactionSelector;
+
     const trackInteraction = (event: MouseEvent) => {
       const target = event.target as HTMLElement | null;
       if (!target) return;
       if (target.closest('.guided-tour-card, .modal')) return;
 
       if (step.id === 'answer-quiz') {
-        const quizAnswers = getQuizAnswerTargets(step.interactionSelector);
+        const quizAnswers = getQuizAnswerTargets(interactionSelector);
         const clickedAnswer = quizAnswers.some((answer) => answer === target || answer.contains(target));
         if (!clickedAnswer) return;
-      } else if (!target.closest(step.interactionSelector)) {
+      } else if (!target.closest(interactionSelector)) {
         return;
       }
 
