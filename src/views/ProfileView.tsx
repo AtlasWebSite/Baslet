@@ -29,8 +29,6 @@ interface ProfileViewProps {
   onDeleteAccount: () => Promise<void>;
 }
 
-const DELETE_CONFIRMATION = 'APAGAR';
-
 export function ProfileView({
   profile,
   studySets,
@@ -46,12 +44,12 @@ export function ProfileView({
   const [compact, setCompact] = useState(false);
   const [busy, setBusy] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [deletePhrase, setDeletePhrase] = useState('');
+  const [deleteConfirmed, setDeleteConfirmed] = useState(false);
   const [deleteError, setDeleteError] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
 
   const allCards = studySets.flatMap((studySet) => studySet.cards);
-  const canConfirmDelete = deletePhrase.trim().toUpperCase() === DELETE_CONFIRMATION;
+  const canConfirmDelete = deleteConfirmed;
 
   const perform = async (action: () => Promise<void>) => {
     setBusy(true);
@@ -67,7 +65,7 @@ export function ProfileView({
     if (isDeleting) return;
 
     setDeleteOpen(false);
-    setDeletePhrase('');
+    setDeleteConfirmed(false);
     setDeleteError('');
   };
 
@@ -264,15 +262,17 @@ export function ProfileView({
             </div>
           </div>
 
-          <label>
-            Digite <strong>{DELETE_CONFIRMATION}</strong> para confirmar
+          <label className="delete-account-check">
             <input
-              value={deletePhrase}
-              onChange={(event) => setDeletePhrase(event.target.value)}
-              autoComplete="off"
+              type="checkbox"
+              checked={deleteConfirmed}
+              onChange={(event) => setDeleteConfirmed(event.target.checked)}
               disabled={isDeleting}
               aria-describedby={deleteError ? 'delete-account-error' : undefined}
             />
+            <span>
+              Entendo que essa ação é permanente e quero apagar minha conta e meus dados.
+            </span>
           </label>
 
           {deleteError && (
