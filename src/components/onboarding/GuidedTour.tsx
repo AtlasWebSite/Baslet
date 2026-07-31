@@ -221,9 +221,45 @@ function getQuizAnswerTargets(selector: string) {
   return explicitButtons;
 }
 
+function getQuizQuestionTarget(answerTargets: HTMLElement[]) {
+  if (!answerTargets.length) return undefined;
+
+  const answerRects = answerTargets.map((element) => element.getBoundingClientRect());
+  const answerTop = Math.min(...answerRects.map((rect) => rect.top));
+  const answerLeft = Math.min(...answerRects.map((rect) => rect.left));
+  const answerRight = Math.max(...answerRects.map((rect) => rect.right));
+
+  const candidates = Array.from(
+    document.querySelectorAll<HTMLElement>('[data-tour="quiz-question"], h1, h2, h3, h4'),
+  )
+    .filter(isVisibleElement)
+    .filter((element) => !element.closest('.guided-tour-card, .modal'))
+    .map((element) => ({ element, rect: element.getBoundingClientRect() }))
+    .filter(({ rect }) => {
+      const isAboveAnswers = rect.bottom <= answerTop + 12;
+      const isNearAnswers = answerTop - rect.bottom <= 220;
+      const overlapsHorizontally = rect.right >= answerLeft && rect.left <= answerRight;
+      return isAboveAnswers && isNearAnswers && overlapsHorizontally;
+    })
+    .sort((a, b) => (answerTop - a.rect.bottom) - (answerTop - b.rect.bottom));
+
+  return candidates[0]?.element;
+}
+
+function getQuizHighlightTargets(selector: string) {
+  const answers = getQuizAnswerTargets(selector);
+  if (!answers.length) return [];
+
+  const question = getQuizQuestionTarget(answers);
+
+  // Mantém a primeira alternativa como âncora da rolagem e apenas amplia
+  // o retângulo de destaque para incluir também o enunciado da pergunta.
+  return question ? [...answers, question] : answers;
+}
+
 function getTargetsForStep(step: TourStep) {
   if (step.id === 'answer-quiz') {
-    return getQuizAnswerTargets(step.target);
+    return getQuizHighlightTargets(step.target);
   }
 
   if (step.highlightAllTargets) {
@@ -489,10 +525,23 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
     retreatTour();
   };
 
-  const cardPosition = useMemo(
-    () => getCardPosition(highlight, step.placement ?? 'bottom'),
-    [highlight, step.placement],
-  );
+  const cardPosition = useMemo(() => {
+    if (step.id === 'answer-quiz' && highlight) {
+      const cardWidth = Math.min(360, window.innerWidth - 28);
+      const centeredLeft = highlight.left + highlight.width / 2 - cardWidth / 2;
+
+      return {
+        top: 14,
+        left: Math.min(
+          Math.max(14, centeredLeft),
+          Math.max(14, window.innerWidth - cardWidth - 14),
+        ),
+        placement: 'top' as TourPlacement,
+      };
+    }
+
+    return getCardPosition(highlight, step.placement ?? 'bottom');
+  }, [highlight, step.id, step.placement]);
   const progress = Math.round(((stepIndex + 1) / tourSteps.length) * 100);
 
   if (!active) return null;
