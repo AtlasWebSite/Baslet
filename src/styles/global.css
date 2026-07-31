@@ -430,6 +430,19 @@ h1,h2,h3,p { margin-top: 0; }
   padding:17px 18px;
 }
 
+.home-secondary-actions{
+  display:grid;
+  grid-template-columns:220px minmax(0,1fr);
+  gap:18px;
+  align-items:center;
+}
+
+.home-secondary-actions h2{
+  margin:6px 0 0;
+  font-size:19px;
+  letter-spacing:-.45px;
+}
+
 .home-view .dashboard-grid{
   display:grid;
   grid-template-columns:minmax(0,1fr) 260px;
@@ -499,6 +512,15 @@ h1,h2,h3,p { margin-top: 0; }
 
   .home-view .quick-grid{
     margin:14px 0 24px;
+  }
+
+  .home-secondary-actions{
+    display:block;
+    margin-top:14px;
+  }
+
+  .home-secondary-actions h2{
+    font-size:18px;
   }
 
   .home-view .daily-card{
