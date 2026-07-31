@@ -446,7 +446,7 @@ export function GuidedTour({ active, onNavigate, onPrepareStep, onComplete, onSk
           <div className="guided-tour-progress" aria-hidden="true"><span style={{ width: `${progress}%` }} /></div>
           <small>Etapa {stepIndex + 1} de {tourSteps.length}</small>
           <h2 id="guided-tour-title" ref={titleRef} tabIndex={-1}>{step.title}</h2>
-          <p>{step.description}</p>
+          <p style={{ fontSize: '16px', lineHeight: 1.55 }}>{step.description}</p>
           {step.actionHint && <div className={interactionDone ? 'guided-tour-hint completed' : 'guided-tour-hint'}><MousePointerClick size={15} />{interactionDone ? 'Interação concluída.' : step.actionHint}</div>}
           <footer>
             <button type="button" className="skip-button" onClick={() => setShowSkipDialog(true)}>Pular tutorial</button>
