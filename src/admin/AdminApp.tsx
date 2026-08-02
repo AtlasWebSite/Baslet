@@ -254,7 +254,7 @@ function AdminRoute({ pathname, periodSelection, refreshKey }: { pathname: strin
 }
 
 function OverviewPage({ periodSelection, refreshKey }: { periodSelection: AdminPeriodSelection; refreshKey: number }) {
-  const state = useAsyncData(() => getAdminOverview(periodSelection), [periodSelection.period, periodSelection.start, periodSelection.end, refreshKey]);
+  const state = useAsyncData('overview', () => getAdminOverview(periodSelection), [periodSelection.period, periodSelection.start, periodSelection.end, refreshKey]);
   if (state.loading) return <AdminSkeleton />;
   if (state.error || !state.data) return <AdminError message={state.error || 'Dados indisponíveis.'} onRetry={state.retry} />;
   const overview = state.data;
@@ -293,7 +293,7 @@ function UsersPage({ refreshKey }: { refreshKey: number }) {
     const query = buildAdminQuery({ search: debouncedSearch, filter: filter === 'all' ? undefined : filter, sort, direction, page });
     window.history.replaceState({}, document.title, `/admin/usuarios${query}`);
   }, [debouncedSearch, filter, sort, direction, page]);
-  const state = useAsyncData(() => getAdminUsers({ search: debouncedSearch, filter, sort, direction, page, pageSize: 25 }), [debouncedSearch, filter, sort, direction, page, refreshKey]);
+  const state = useAsyncData('users', () => getAdminUsers({ search: debouncedSearch, filter, sort, direction, page, pageSize: 25 }), [debouncedSearch, filter, sort, direction, page, refreshKey]);
   return (
     <div className="admin-stack">
       <div className="admin-toolbar">
@@ -322,7 +322,7 @@ function UsersTable({ result, page, onPage }: { result: AdminPaginatedUsers; pag
 
 function UserDetailPage({ userId, refreshKey }: { userId: string; refreshKey: number }) {
   const [copySuccess, setCopySuccess] = useState(false);
-  const state = useAsyncData(() => getAdminUser(userId), [userId, refreshKey]);
+  const state = useAsyncData(`user:${userId}`, () => getAdminUser(userId), [userId, refreshKey]);
   if (state.loading) return <AdminSkeleton />;
   if (state.error || !state.data) return <AdminError message={state.error || 'Usuário não encontrado.'} onRetry={state.retry} />;
   const user = state.data;
@@ -352,7 +352,7 @@ function SubscriptionsPage({ refreshKey }: { refreshKey: number }) {
     const query = buildAdminQuery({ search: debouncedSearch, status: status === 'all' ? undefined : status, page });
     window.history.replaceState({}, document.title, `/admin/assinaturas${query}`);
   }, [debouncedSearch, status, page]);
-  const state = useAsyncData(() => getAdminSubscriptions({ search: debouncedSearch, status, page, pageSize: 25 }), [debouncedSearch, status, page, refreshKey]);
+  const state = useAsyncData('subscriptions', () => getAdminSubscriptions({ search: debouncedSearch, status, page, pageSize: 25 }), [debouncedSearch, status, page, refreshKey]);
   return <div className="admin-stack">
     <AdminNotice>Nenhuma ação financeira manual foi criada. O status exibido vem do registro sincronizado com o Mercado Pago.</AdminNotice>
     <div className="admin-toolbar"><label className="admin-search"><Search size={17} /><input value={search} onChange={(event: ChangeEvent<HTMLInputElement>) => setSearch(event.target.value)} placeholder="Usuário, e-mail ou ID" /></label><select value={status} onChange={(event: ChangeEvent<HTMLSelectElement>) => { setStatus(event.target.value); setPage(1); }}><option value="all">Todos os status</option><option value="active">Ativa</option><option value="pending">Pendente</option><option value="cancelled">Cancelada</option><option value="rejected">Recusada</option><option value="paused">Pausada</option></select><a className="admin-secondary-button" href={`/api/admin/report${buildAdminQuery({ type: 'subscriptions', search: debouncedSearch, status: status === 'all' ? undefined : status })}`}><Download size={16} /> Exportar CSV</a></div>
@@ -367,7 +367,7 @@ function SubscriptionsTable({ result, page, onPage }: { result: AdminPaginatedSu
 
 interface PaymentsResponse { payments: { available: boolean; reason: string; implementationRequired: string } }
 function PaymentsPage({ refreshKey }: { refreshKey: number }) {
-  const state = useAsyncData(() => getAdminSection<PaymentsResponse>('payments'), [refreshKey]);
+  const state = useAsyncData('payments', () => getAdminSection<PaymentsResponse>('payments'), [refreshKey]);
   if (state.loading) return <AdminSkeleton />;
   if (state.error || !state.data) return <AdminError message={state.error || 'Erro ao carregar.'} onRetry={state.retry} />;
   return <AdminPanel title="Pagamentos individuais" subtitle="Receita, taxas, liquidações e reembolsos"><AdminUnavailable reason={`${state.data.payments.reason} ${state.data.payments.implementationRequired}`} /></AdminPanel>;
@@ -375,7 +375,7 @@ function PaymentsPage({ refreshKey }: { refreshKey: number }) {
 
 interface EngagementResponse { engagement: { metrics: { activeUsers: number; sessions: number; averageSessionsPerActiveUser: number; retentionD1: number | null; retentionD7: number | null; retentionD30: number | null }; notice: string; topUsers: Array<{ id: string; name: string; email: string; events: number }>; abandonedUsers: Array<{ id: string; name: string; email: string; lastLoginAt: string | null }>; activeSeries: AdminSeriesPoint[] } }
 function EngagementPage({ periodSelection, refreshKey }: { periodSelection: AdminPeriodSelection; refreshKey: number }) {
-  const state = useAsyncData(() => getAdminSection<EngagementResponse>('engagement', periodSelection), [periodSelection.period, periodSelection.start, periodSelection.end, refreshKey]);
+  const state = useAsyncData('engagement', () => getAdminSection<EngagementResponse>('engagement', periodSelection), [periodSelection.period, periodSelection.start, periodSelection.end, refreshKey]);
   if (state.loading) return <AdminSkeleton />;
   if (state.error || !state.data) return <AdminError message={state.error || 'Erro ao carregar.'} onRetry={state.retry} />;
   const data = state.data.engagement;
@@ -392,7 +392,7 @@ function EngagementPage({ periodSelection, refreshKey }: { periodSelection: Admi
 
 interface ResourcesResponse { resources: { flashcards: { created: number; reviewed: number; uniqueUsers: number }; mentalMaps: { created: number; uniqueUsers: number }; quizzes: { completed: number; uniqueUsers: number; averageAccuracy: number }; ai: { available: boolean; reason: string }; series: Array<{ date: string; flashcards: number; mentalMaps: number; quizzes: number }> } }
 function ResourcesPage({ periodSelection, refreshKey }: { periodSelection: AdminPeriodSelection; refreshKey: number }) {
-  const state = useAsyncData(() => getAdminSection<ResourcesResponse>('resources', periodSelection), [periodSelection.period, periodSelection.start, periodSelection.end, refreshKey]);
+  const state = useAsyncData('resources', () => getAdminSection<ResourcesResponse>('resources', periodSelection), [periodSelection.period, periodSelection.start, periodSelection.end, refreshKey]);
   if (state.loading) return <AdminSkeleton />;
   if (state.error || !state.data) return <AdminError message={state.error || 'Erro ao carregar.'} onRetry={state.retry} />;
   const data = state.data.resources;
@@ -401,7 +401,7 @@ function ResourcesPage({ periodSelection, refreshKey }: { periodSelection: Admin
 
 interface FinanceResponse { finance: { contracted: { activeSubscriptions: number; pendingSubscriptions: number; cancelledSubscriptions: number; rejectedSubscriptions: number; mrr: number; averageContract: number }; realizedRevenue: { available: boolean; reason: string }; aiCosts: { available: boolean; reason: string } } }
 function FinancePage({ refreshKey }: { refreshKey: number }) {
-  const state = useAsyncData(() => getAdminSection<FinanceResponse>('finance'), [refreshKey]);
+  const state = useAsyncData('finance', () => getAdminSection<FinanceResponse>('finance'), [refreshKey]);
   if (state.loading) return <AdminSkeleton />;
   if (state.error || !state.data) return <AdminError message={state.error || 'Erro ao carregar.'} onRetry={state.retry} />;
   const data = state.data.finance;
@@ -421,7 +421,7 @@ function ErrorsPage({ refreshKey }: { refreshKey: number }) {
   const [status, setStatus] = useState(initialParams.get('status') ?? 'all');
   const [localRefresh, setLocalRefresh] = useState(0);
   const [actionError, setActionError] = useState('');
-  const state = useAsyncData(() => getAdminSection<ErrorsResponse>(`errors?status=${encodeURIComponent(status)}&page=${page}&pageSize=25`), [status, page, refreshKey, localRefresh]);
+  const state = useAsyncData('errors', () => getAdminSection<ErrorsResponse>(`errors?status=${encodeURIComponent(status)}&page=${page}&pageSize=25`), [status, page, refreshKey, localRefresh]);
   useEffect(() => { const query = buildAdminQuery({ status: status === 'all' ? undefined : status, page }); window.history.replaceState({}, document.title, `/admin/erros${query}`); }, [status, page]);
   const changeStatus = async (id: string, nextStatus: string) => { setActionError(''); try { await updateAdminErrorStatus(id, nextStatus); setLocalRefresh((value) => value + 1); } catch (error) { setActionError(error instanceof Error ? error.message : 'Não foi possível atualizar o status.'); } };
   if (state.loading) return <AdminSkeleton rows={8} />;
@@ -432,7 +432,7 @@ function ErrorsPage({ refreshKey }: { refreshKey: number }) {
 
 interface ReportsResponse { reports: Array<{ type: string; label: string; available: boolean; reason?: string }> }
 function ReportsPage({ periodSelection, refreshKey }: { periodSelection: AdminPeriodSelection; refreshKey: number }) {
-  const state = useAsyncData(() => getAdminSection<ReportsResponse>('reports'), [refreshKey]);
+  const state = useAsyncData('reports', () => getAdminSection<ReportsResponse>('reports'), [refreshKey]);
   if (state.loading) return <AdminSkeleton />;
   if (state.error || !state.data) return <AdminError message={state.error || 'Erro ao carregar.'} onRetry={state.retry} />;
   return <div className="admin-report-grid">{state.data.reports.map((report) => <AdminPanel key={report.type} title={report.label} subtitle={report.available ? 'CSV gerado no servidor com autorização revalidada' : report.reason}>{report.available ? <a className="admin-primary-button" href={`/api/admin/report${buildAdminQuery({ type: report.type, period: periodSelection.period, start: periodSelection.start, end: periodSelection.end })}`}><Download size={16} /> Baixar CSV</a> : <AdminUnavailable reason={report.reason ?? 'Indisponível'} />}</AdminPanel>)}</div>;
@@ -440,7 +440,7 @@ function ReportsPage({ periodSelection, refreshKey }: { periodSelection: AdminPe
 
 interface SettingsResponse { settings: { values: Record<string, unknown>; editableKeys: string[] } }
 function SettingsPage({ refreshKey }: { refreshKey: number }) {
-  const state = useAsyncData(() => getAdminSection<SettingsResponse>('settings'), [refreshKey]);
+  const state = useAsyncData('settings', () => getAdminSection<SettingsResponse>('settings'), [refreshKey]);
   const [values, setValues] = useState<Record<string, unknown>>({});
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState('');
@@ -448,34 +448,72 @@ function SettingsPage({ refreshKey }: { refreshKey: number }) {
   useEffect(() => { if (state.data) setValues(state.data.settings.values); }, [state.data]);
   const save = async () => {
     setSaving(true); setSuccess(''); setSaveError('');
-    try { const result = await updateAdminSettings(values); setValues(result.settings.values); setSuccess('Configurações salvas e registradas na auditoria.'); } catch (error) { setSaveError(error instanceof Error ? error.message : 'Não foi possível salvar.'); } finally { setSaving(false); }
+    try {
+      const result = await updateAdminSettings(values);
+      setValues(result.settings.values);
+      adminDataCache.set(adminCacheKey('settings', [refreshKey]), result);
+      setSuccess('Configurações salvas e registradas na auditoria.');
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'Não foi possível salvar.');
+    } finally {
+      setSaving(false);
+    }
   };
   if (state.loading) return <AdminSkeleton />;
   if (state.error || !state.data) return <AdminError message={state.error || 'Erro ao carregar.'} onRetry={state.retry} />;
   return <AdminPanel title="Configurações administrativas" subtitle="Somente preferências realmente utilizadas pelo painel. Segredos não são exibidos."><div className="admin-form-grid"><label><span>Dias para considerar inatividade</span><input type="number" min="1" max="365" value={Number(values.inactivity_days ?? 30)} onChange={(event: ChangeEvent<HTMLInputElement>) => setValues((current) => ({ ...current, inactivity_days: Number(event.target.value) }))} /><small>Este valor altera os filtros de usuários ativos e inativos no backend.</small></label></div>{success && <p className="admin-success-message">{success}</p>}{saveError && <p className="admin-error-message">{saveError}</p>}<button className="admin-primary-button" disabled={saving} onClick={() => void save()}>{saving ? 'Salvando...' : 'Salvar configurações'}</button></AdminPanel>;
 }
 
-function useAsyncData<T>(loader: () => Promise<T>, dependencies: ReadonlyArray<unknown>) {
-  const [data, setData] = useState<T>();
-  const [loading, setLoading] = useState(true);
+// Cache em memória por sessão do painel: guarda o último resultado bem-sucedido
+// de cada seção/filtro para que trocar de aba não refaça a mesma requisição.
+// "Atualizar" (refreshKey) e qualquer mudança de filtro sempre geram uma nova
+// chave, então nunca mostram dado desatualizado por engano.
+const adminDataCache = new Map<string, unknown>();
+const adminInFlightRequests = new Map<string, Promise<unknown>>();
+
+function adminCacheKey(namespace: string, dependencies: ReadonlyArray<unknown>) {
+  return `${namespace}:${JSON.stringify(dependencies)}`;
+}
+
+function fetchWithAdminCache<T>(key: string, loader: () => Promise<T>): Promise<T> {
+  if (adminDataCache.has(key)) return Promise.resolve(adminDataCache.get(key) as T);
+  const pending = adminInFlightRequests.get(key) as Promise<T> | undefined;
+  if (pending) return pending;
+  const request = loader()
+    .then((value) => { adminDataCache.set(key, value); return value; })
+    .finally(() => { adminInFlightRequests.delete(key); });
+  adminInFlightRequests.set(key, request);
+  return request;
+}
+
+function useAsyncData<T>(namespace: string, loader: () => Promise<T>, dependencies: ReadonlyArray<unknown>) {
+  const key = adminCacheKey(namespace, dependencies);
+  const [data, setData] = useState<T | undefined>(() => adminDataCache.get(key) as T | undefined);
+  const [loading, setLoading] = useState(() => !adminDataCache.has(key));
   const [error, setError] = useState('');
   const [retryKey, setRetryKey] = useState(0);
   const loaderRef = useRef(loader);
   loaderRef.current = loader;
-  const dependencyKey = JSON.stringify(dependencies);
 
   useEffect(() => {
     let mounted = true;
-    setLoading(true);
+    const cached = adminDataCache.has(key) ? (adminDataCache.get(key) as T) : undefined;
+    setData(cached);
+    setLoading(!adminDataCache.has(key));
     setError('');
-    loaderRef.current()
+    fetchWithAdminCache(key, loaderRef.current)
       .then((value) => { if (mounted) setData(value); })
       .catch((reason: Error) => { if (mounted) setError(reason.message); })
       .finally(() => { if (mounted) setLoading(false); });
     return () => { mounted = false; };
-  }, [dependencyKey, retryKey]);
+  }, [key, retryKey]);
 
-  return { data, loading, error, retry: () => setRetryKey((value) => value + 1) };
+  return {
+    data,
+    loading,
+    error,
+    retry: () => { adminDataCache.delete(key); setRetryKey((value) => value + 1); },
+  };
 }
 
 function MetricCard({ metric }: { metric: AdminMetric }) {
