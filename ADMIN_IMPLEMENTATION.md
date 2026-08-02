@@ -2,7 +2,7 @@
 
 ## Auditoria da infraestrutura
 
-O projeto utiliza React, Vite e TypeScript no frontend. O roteamento é realizado pelo próprio aplicativo por meio de `window.location.pathname`; não existe React Router instalado. O backend usa Vercel Functions com um catch-all principal em `api/[...route].ts`. As rotas administrativas usam um catch-all dedicado em `api/admin/[...route].ts`, sem criar um segundo backend.
+O projeto utiliza React, Vite e TypeScript no frontend. O roteamento é realizado pelo próprio aplicativo por meio de `window.location.pathname`; não existe React Router instalado. O backend foi dividido em oito Vercel Functions por domínio: autenticação, perfil, conjuntos, aprendizado, pagamentos, conta, saúde da API e administração. O código compartilhado fica em `server/`, fora de `api/`, sem criar um segundo backend.
 
 A autenticação existente usa Google OAuth e uma sessão JWT HS256 armazenada no cookie HTTP-only `studyflow_session`. O banco é PostgreSQL, acessado por `@vercel/postgres`. A integração financeira existente persiste assinaturas do Mercado Pago, mas não persiste cobranças individuais, taxas, liquidações ou reembolsos.
 
@@ -76,4 +76,4 @@ Em **Settings → Environment Variables**, defina `ADMIN_EMAIL` com o e-mail exa
 
 ## Compatibilidade de roteamento da Vercel
 
-Além dos handlers catch-all, o projeto inclui funções estáticas para cada endpoint público e administrativo. Isso evita 404 em projetos Vite nos quais o roteamento dinâmico de funções não é materializado corretamente durante o deploy. Use `/api/health` para confirmar que as Vercel Functions foram publicadas.
+O arquivo `vercel.json` preserva todas as URLs públicas existentes e as direciona para as Functions responsáveis por cada domínio. A administração continua em `api/admin/[...route].ts`. Use `/api/health` para confirmar que as Vercel Functions foram publicadas.
