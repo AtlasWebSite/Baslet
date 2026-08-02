@@ -392,11 +392,60 @@
    ========================================================================== */
 
 .admin-chart { height: 260px; display: flex; flex-direction: column; color: var(--admin-ink); }
-.admin-chart svg { width: 100%; flex: 1; overflow: visible; border-left: 1px solid var(--admin-border); border-bottom: 1px solid var(--admin-border); }
-.admin-chart path { transition: d .2s var(--admin-ease); }
-.admin-chart circle { fill: var(--admin-ink); transition: r .12s var(--admin-ease); }
-.admin-chart circle:hover { r: 2.6; }
 .admin-chart__axis { display: flex; justify-content: space-between; padding-top: 9px; color: var(--admin-text-subtle); font-size: 10px; font-family: var(--admin-font-mono); }
+
+/* Bar chart — único ponto do painel com cor de destaque (índigo), o resto
+   do dashboard permanece monocromático. */
+.admin-barchart__track {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  padding-bottom: 1px;
+  border-left: 1px solid var(--admin-border);
+  border-bottom: 1px solid var(--admin-border);
+}
+.admin-barchart__col { flex: 1; min-width: 2px; height: 100%; display: flex; align-items: flex-end; }
+.admin-barchart__bar {
+  width: 100%;
+  min-height: 2px;
+  background: #4f46e5 !important;
+  border-radius: 3px 3px 0 0 !important;
+  transition: background-color .12s var(--admin-ease), opacity .12s var(--admin-ease);
+}
+.admin-barchart__col:hover .admin-barchart__bar { background: #3730a3 !important; }
+
+/* Donut chart — anel via conic-gradient puro em CSS, sem dependência externa. */
+.admin-donut { display: flex; align-items: center; gap: 24px; height: 260px; }
+.admin-donut__ring {
+  position: relative;
+  flex-shrink: 0;
+  width: 168px;
+  height: 168px;
+  border-radius: 50% !important;
+}
+.admin-donut__center {
+  position: absolute;
+  inset: 22px;
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  background: var(--admin-surface);
+  border-radius: 50% !important;
+  text-align: center;
+}
+.admin-donut__center span { color: var(--admin-text-muted); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
+.admin-donut__center strong { font-family: var(--admin-font-mono); font-size: 20px; font-weight: 700; letter-spacing: -.02em; }
+.admin-donut__legend { display: grid; gap: 10px; flex: 1; min-width: 0; }
+.admin-donut__legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--admin-text-muted); }
+.admin-donut__legend-item i { width: 9px; height: 9px; flex-shrink: 0; border-radius: 50% !important; }
+.admin-donut__legend-item span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-donut__legend-item b { font-family: var(--admin-font-mono); color: var(--admin-ink); font-size: 12px; }
+
+@media (max-width: 480px) {
+  .admin-donut { flex-direction: column; align-items: flex-start; height: auto; gap: 16px; }
+  .admin-donut__ring { align-self: center; }
+}
 
 /* ==========================================================================
    States: loading / empty / error
@@ -444,8 +493,8 @@
   .admin-primary-button,
   .admin-secondary-button,
   .admin-icon-button,
-  .admin-chart path,
-  .admin-chart circle {
+  .admin-barchart__bar,
+  .admin-donut__ring {
     animation: none !important;
     transition: none !important;
   }

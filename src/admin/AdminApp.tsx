@@ -263,7 +263,7 @@ function OverviewPage({ periodSelection, refreshKey }: { periodSelection: AdminP
       <AdminNotice>{overview.instrumentation.activityAvailableSince}. {overview.instrumentation.paymentsReason}</AdminNotice>
       <div className="admin-metric-grid">{overview.metrics.map((item) => <MetricCard key={item.id} metric={item} />)}</div>
       <div className="admin-grid-2">
-        <AdminPanel title="Crescimento de usuários" subtitle="Cadastros reais no período selecionado"><LineChart points={overview.userGrowth} /></AdminPanel>
+        <AdminPanel title="Crescimento de usuários" subtitle="Cadastros reais no período selecionado"><BarChart points={overview.userGrowth} /></AdminPanel>
         <AdminPanel title="Uso acumulado dos recursos" subtitle="Dados existentes nas tabelas atuais"><ResourceSummary overview={overview} /></AdminPanel>
       </div>
     </div>
@@ -387,7 +387,7 @@ function EngagementPage({ periodSelection, refreshKey }: { periodSelection: Admi
     { id: 'd7', label: 'Retenção D7', value: data.metrics.retentionD7, previous: null, changePercent: null, format: 'percent', explanation: 'Retorno sete dias após o cadastro.', status: data.metrics.retentionD7 === null ? 'unavailable' : 'available' },
     { id: 'd30', label: 'Retenção D30', value: data.metrics.retentionD30, previous: null, changePercent: null, format: 'percent', explanation: 'Retorno trinta dias após o cadastro.', status: data.metrics.retentionD30 === null ? 'unavailable' : 'available' },
   ];
-  return <div className="admin-stack"><AdminNotice>{data.notice}</AdminNotice><div className="admin-metric-grid">{metrics.map((item) => <MetricCard key={item.id} metric={item} />)}</div><div className="admin-grid-2"><AdminPanel title="Ativos por dia"><LineChart points={data.activeSeries} /></AdminPanel><AdminPanel title="Usuários mais ativos"><SimpleUserList users={data.topUsers.map((user) => ({ ...user, value: `${user.events} eventos` }))} /></AdminPanel></div><AdminPanel title="Usuários sem acesso recente"><SimpleUserList users={data.abandonedUsers.map((user) => ({ ...user, value: formatDate(user.lastLoginAt) }))} /></AdminPanel></div>;
+  return <div className="admin-stack"><AdminNotice>{data.notice}</AdminNotice><div className="admin-metric-grid">{metrics.map((item) => <MetricCard key={item.id} metric={item} />)}</div><div className="admin-grid-2"><AdminPanel title="Ativos por dia"><BarChart points={data.activeSeries} /></AdminPanel><AdminPanel title="Usuários mais ativos"><SimpleUserList users={data.topUsers.map((user) => ({ ...user, value: `${user.events} eventos` }))} /></AdminPanel></div><AdminPanel title="Usuários sem acesso recente"><SimpleUserList users={data.abandonedUsers.map((user) => ({ ...user, value: formatDate(user.lastLoginAt) }))} /></AdminPanel></div>;
 }
 
 interface ResourcesResponse { resources: { flashcards: { created: number; reviewed: number; uniqueUsers: number }; mentalMaps: { created: number; uniqueUsers: number }; quizzes: { completed: number; uniqueUsers: number; averageAccuracy: number }; ai: { available: boolean; reason: string }; series: Array<{ date: string; flashcards: number; mentalMaps: number; quizzes: number }> } }
@@ -411,7 +411,13 @@ function FinancePage({ refreshKey }: { refreshKey: number }) {
     { id: 'active', label: 'Assinaturas ativas', value: data.contracted.activeSubscriptions, previous: null, changePercent: null, format: 'number', explanation: 'Status active.', status: 'available' },
     { id: 'pending', label: 'Assinaturas pendentes', value: data.contracted.pendingSubscriptions, previous: null, changePercent: null, format: 'number', explanation: 'Status pending.', status: 'available' },
   ];
-  return <div className="admin-stack"><AdminNotice>Valores contratados não são tratados como receita liquidada.</AdminNotice><div className="admin-metric-grid">{metrics.map((item) => <MetricCard key={item.id} metric={item} />)}</div><div className="admin-grid-2"><AdminPanel title="Receita realizada"><AdminUnavailable reason={data.realizedRevenue.reason} /></AdminPanel><AdminPanel title="Custos de IA"><AdminUnavailable reason={data.aiCosts.reason} /></AdminPanel></div></div>;
+  const statusSegments: DonutSegment[] = [
+    { label: 'Ativas', value: data.contracted.activeSubscriptions },
+    { label: 'Pendentes', value: data.contracted.pendingSubscriptions },
+    { label: 'Canceladas', value: data.contracted.cancelledSubscriptions },
+    { label: 'Recusadas', value: data.contracted.rejectedSubscriptions },
+  ];
+  return <div className="admin-stack"><AdminNotice>Valores contratados não são tratados como receita liquidada.</AdminNotice><div className="admin-metric-grid">{metrics.map((item) => <MetricCard key={item.id} metric={item} />)}</div><div className="admin-grid-3"><AdminPanel title="Assinaturas por status" subtitle="Distribuição real das assinaturas cadastradas"><DonutChart segments={statusSegments} centerLabel="Total" /></AdminPanel><AdminPanel title="Receita realizada"><AdminUnavailable reason={data.realizedRevenue.reason} /></AdminPanel><AdminPanel title="Custos de IA"><AdminUnavailable reason={data.aiCosts.reason} /></AdminPanel></div></div>;
 }
 
 interface ErrorsResponse { result: { page: number; pageSize: number; total: number; errors: AdminErrorItem[]; notice: string } }
@@ -521,15 +527,56 @@ function MetricCard({ metric }: { metric: AdminMetric }) {
   return <article className={`admin-metric-card ${metric.status === 'unavailable' ? 'is-unavailable' : ''}`} title={metric.explanation}><span>{metric.label}</span><strong>{formatMetric(metric.value, metric.format)}</strong>{metric.changePercent !== null && <small className={positive ? 'is-positive' : 'is-negative'}>{positive ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{Math.abs(metric.changePercent).toFixed(1)}% vs. período anterior</small>}<p>{metric.explanation}</p></article>;
 }
 
-function LineChart({ points }: { points: AdminSeriesPoint[] }) {
-  const normalized = useMemo(() => {
+function BarChart({ points }: { points: AdminSeriesPoint[] }) {
+  const bars = useMemo(() => {
     if (!points.length) return [];
     const max = Math.max(...points.map((point) => point.value), 1);
-    return points.map((point, index) => ({ ...point, x: points.length === 1 ? 50 : (index / (points.length - 1)) * 100, y: 92 - (point.value / max) * 80 }));
+    return points.map((point) => ({ ...point, heightPercent: Math.max((point.value / max) * 100, point.value > 0 ? 4 : 0) }));
   }, [points]);
-  if (!normalized.length) return <AdminEmpty title="Sem registros no período" description="O gráfico será preenchido quando houver dados." />;
-  const path = normalized.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
-  return <div className="admin-chart"><svg viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="Evolução no período"><path d={path} fill="none" stroke="currentColor" strokeWidth="2" vectorEffect="non-scaling-stroke" />{normalized.map((point) => <circle key={point.date} cx={point.x} cy={point.y} r="1.4"><title>{point.date}: {point.value}</title></circle>)}</svg><div className="admin-chart__axis"><span>{normalized[0]?.date}</span><span>{normalized.at(-1)?.date}</span></div></div>;
+  if (!bars.length) return <AdminEmpty title="Sem registros no período" description="O gráfico será preenchido quando houver dados." />;
+  return (
+    <div className="admin-chart admin-barchart">
+      <div className="admin-barchart__track" role="img" aria-label="Evolução no período">
+        {bars.map((bar) => (
+          <div key={bar.date} className="admin-barchart__col" title={`${bar.date}: ${bar.value}`}>
+            <div className="admin-barchart__bar" style={{ height: `${bar.heightPercent}%` }} />
+          </div>
+        ))}
+      </div>
+      <div className="admin-chart__axis"><span>{bars[0]?.date}</span><span>{bars.at(-1)?.date}</span></div>
+    </div>
+  );
+}
+
+const donutPalette = ['#4f46e5', '#818cf8', '#c7d2fe', '#e0e7ff', '#a5b4fc'];
+
+interface DonutSegment { label: string; value: number }
+function DonutChart({ segments, centerLabel }: { segments: DonutSegment[]; centerLabel: string }) {
+  const total = segments.reduce((sum, segment) => sum + segment.value, 0);
+  if (!total) return <AdminEmpty title="Sem dados para exibir" description="Este gráfico será preenchido quando houver registros." />;
+  let cumulative = 0;
+  const stops = segments.map((segment, index) => {
+    const start = (cumulative / total) * 100;
+    cumulative += segment.value;
+    const end = (cumulative / total) * 100;
+    return `${donutPalette[index % donutPalette.length]} ${start}% ${end}%`;
+  });
+  return (
+    <div className="admin-donut">
+      <div className="admin-donut__ring" style={{ background: `conic-gradient(${stops.join(', ')})` }}>
+        <div className="admin-donut__center"><span>{centerLabel}</span><strong>{new Intl.NumberFormat('pt-BR').format(total)}</strong></div>
+      </div>
+      <div className="admin-donut__legend">
+        {segments.map((segment, index) => (
+          <div key={segment.label} className="admin-donut__legend-item">
+            <i style={{ background: donutPalette[index % donutPalette.length] }} />
+            <span>{segment.label}</span>
+            <b>{new Intl.NumberFormat('pt-BR').format(segment.value)}</b>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function AdminPanel({ title, subtitle, action, children }: { title: string; subtitle?: string; action?: ReactNode; children: ReactNode }) {
