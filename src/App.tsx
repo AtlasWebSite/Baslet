@@ -32,6 +32,7 @@ import { QuizView } from './views/QuizView';
 import { ProgressView } from './views/ProgressView';
 import { ProfileView } from './views/ProfileView';
 import { MindMapsView } from './views/MindMapsView';
+import { AdminApp } from './admin/AdminApp';
 
 const LEGACY_KEY = 'studyflow_sets_v1';
 const INITIAL_VIEW: ViewId = 'home';
@@ -51,6 +52,7 @@ function isPaymentRedirectPath(pathname: string) {
 export function App() {
   const auth = useAuth();
   if (window.location.pathname === '/auth/callback') return <AuthCallbackPage />;
+  if (window.location.pathname.startsWith('/admin')) return <AdminApp authenticated={Boolean(auth.user)} authLoading={auth.isLoading} authError={auth.error} />;
   if (isPaymentRedirectPath(window.location.pathname)) return <PaymentEntryPage auth={auth} />;
   return <AuthGuard session={auth.session} isLoading={auth.isLoading} error={auth.error}>{auth.user && <AuthenticatedApp user={auth.user}/>}</AuthGuard>;
 }

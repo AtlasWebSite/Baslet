@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { sql } from '@vercel/postgres';
 import type { SessionUser } from './session.js';
 
@@ -6,7 +7,10 @@ let schemaPromise: Promise<void> | undefined;
 export async function ensureSchema() {
   if (schemaPromise) return schemaPromise;
 
-  schemaPromise = createSchema();
+  schemaPromise = createSchema().catch((error) => {
+    schemaPromise = undefined;
+    throw error;
+  });
   return schemaPromise;
 }
 
@@ -122,10 +126,76 @@ async function createSchema() {
   await sql`alter table subscriptions add column if not exists mercado_pago_checkout_url text`;
   await sql`alter table profiles add column if not exists walkthrough_completed boolean not null default false`;
   await sql`alter table profiles add column if not exists walkthrough_completed_at timestamptz`;
+  await sql`alter table profiles add column if not exists last_login_at timestamptz`;
+  await sql`alter table profiles add column if not exists account_status text not null default 'active'`;
 
   await sql`create index if not exists study_sets_user_idx on study_sets(user_id)`;
   await sql`create index if not exists flashcards_user_set_idx on flashcards(user_id, study_set_id)`;
   await sql`create index if not exists mental_maps_user_idx on mental_maps(user_id)`;
+  await sql`
+    create table if not exists activity_events (
+      id text primary key,
+      user_id text references profiles(id) on delete cascade,
+      event_type text not null,
+      resource_type text,
+      resource_id text,
+      metadata jsonb not null default '{}',
+      created_at timestamptz not null default now()
+    )
+  `;
+
+  await sql`
+    create table if not exists application_errors (
+      id text primary key,
+      fingerprint text not null,
+      category text not null default 'unknown',
+      message text not null,
+      page text,
+      user_id text references profiles(id) on delete set null,
+      browser text,
+      device text,
+      status text not null default 'new',
+      occurrence_count integer not null default 1,
+      first_occurred_at timestamptz not null default now(),
+      last_occurred_at timestamptz not null default now(),
+      safe_details jsonb not null default '{}'
+    )
+  `;
+
+  await sql`
+    create table if not exists admin_audit_logs (
+      id text primary key,
+      admin_user_id text not null,
+      action text not null,
+      target_type text,
+      target_id text,
+      result text not null,
+      metadata jsonb not null default '{}',
+      created_at timestamptz not null default now()
+    )
+  `;
+
+  await sql`
+    create table if not exists admin_settings (
+      key text primary key,
+      value jsonb not null,
+      updated_by text not null,
+      updated_at timestamptz not null default now()
+    )
+  `;
+
+  await sql`create index if not exists profiles_email_idx on profiles(lower(email))`;
+  await sql`create index if not exists profiles_created_at_idx on profiles(created_at)`;
+  await sql`create index if not exists profiles_last_login_idx on profiles(last_login_at)`;
+  await sql`create index if not exists activity_events_user_created_idx on activity_events(user_id, created_at desc)`;
+  await sql`create index if not exists activity_events_type_created_idx on activity_events(event_type, created_at desc)`;
+  await sql`create unique index if not exists application_errors_fingerprint_unique_idx on application_errors(fingerprint)`;
+  await sql`create index if not exists application_errors_status_idx on application_errors(status, last_occurred_at desc)`;
+  await sql`create index if not exists admin_audit_logs_created_idx on admin_audit_logs(created_at desc)`;
+  await sql`create index if not exists subscriptions_status_idx on subscriptions(status)`;
+  await sql`create index if not exists quiz_results_user_created_idx on quiz_results(user_id, created_at desc)`;
+  await sql`create index if not exists study_progress_user_reviewed_idx on study_progress(user_id, last_reviewed_at desc)`;
+
   await sql`create index if not exists subscriptions_preapproval_idx on subscriptions(mercado_pago_preapproval_id)`;
 }
 
@@ -133,15 +203,42 @@ export async function upsertProfileFromSession(user: SessionUser) {
   await ensureSchema();
 
   const { rows } = await sql`
-    insert into profiles (id, full_name, avatar_url, email, updated_at)
-    values (${user.id}, ${user.fullName}, ${user.avatarUrl}, ${user.email}, now())
+    insert into profiles (id, full_name, avatar_url, email, last_login_at, updated_at)
+    values (${user.id}, ${user.fullName}, ${user.avatarUrl}, ${user.email}, now(), now())
     on conflict (id) do update set
       full_name = excluded.full_name,
       avatar_url = excluded.avatar_url,
       email = excluded.email,
+      last_login_at = now(),
       updated_at = now()
     returning *
   `;
 
+  try {
+    await sql`
+      insert into activity_events (id, user_id, event_type, resource_type, resource_id, metadata)
+      values (${randomUUID()}, ${user.id}, 'user_login', 'profile', ${user.id}, '{}'::jsonb)
+    `;
+  } catch (error) {
+    console.error('Não foi possível registrar o login no histórico de atividade:', error instanceof Error ? error.message : error);
+  }
   return rows[0];
+}
+
+
+export async function touchProfileSession(userId: string) {
+  await ensureSchema();
+  await sql`update profiles set last_login_at = now(), updated_at = now() where id = ${userId}`;
+  try {
+    await sql`
+      insert into activity_events (id, user_id, event_type, resource_type, resource_id, metadata)
+      select ${randomUUID()}, ${userId}, 'session_started', 'session', null, '{}'::jsonb
+      where not exists (
+        select 1 from activity_events
+        where user_id = ${userId} and event_type = 'session_started' and created_at >= now() - interval '15 minutes'
+      )
+    `;
+  } catch (error) {
+    console.error('Não foi possível registrar a sessão no histórico de atividade:', error instanceof Error ? error.message : error);
+  }
 }

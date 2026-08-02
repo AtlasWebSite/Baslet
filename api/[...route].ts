@@ -22,7 +22,8 @@ import {
   updateSubscriptionFromMercadoPago,
   updateMentalMapForUser,
 } from './_lib/data.js';
-import { upsertProfileFromSession } from './_lib/db.js';
+import { touchProfileSession, upsertProfileFromSession } from './_lib/db.js';
+import { recordApplicationError } from './_lib/activity.js';
 import { getAppUrl, json, methodNotAllowed, readJsonBody, requireEnvironment } from './_lib/http.js';
 import {
   cancelMercadoPagoSubscription,
@@ -104,6 +105,13 @@ function getRouteSegments(request: VercelRequest) {
 
 function getMethod(request: VercelRequest) {
   return request.method ?? 'GET';
+}
+
+function getErrorRequestContext(request: VercelRequest) {
+  const browser = typeof request.headers['user-agent'] === 'string' ? request.headers['user-agent'] : null;
+  const mobileHint = request.headers['sec-ch-ua-mobile'];
+  const device = mobileHint === '?1' || (browser ? /Android|iPhone|iPad|Mobile/i.test(browser) : false) ? 'mobile' : 'desktop';
+  return { browser, device };
 }
 
 function unauthorized(response: VercelResponse, message = 'Entre novamente para continuar.') {
@@ -220,6 +228,7 @@ async function handleGoogleCallback(request: VercelRequest, response: VercelResp
     if (nextPath !== '/') callbackUrl.searchParams.set('next', nextPath);
     response.redirect(callbackUrl.toString());
   } catch (error) {
+    await recordApplicationError({ category: 'authentication', message: error instanceof Error ? error.message : 'Erro na callback Google', page: '/api/auth/callback', ...getErrorRequestContext(request) }).catch(() => undefined);
     console.error('Erro na callback Google/Vercel:', error);
     response.redirect(`${appUrl}/auth/callback?error_description=${encodeURIComponent('Erro inesperado ao concluir o login.')}`);
   }
@@ -236,6 +245,8 @@ async function handleAuthSession(request: VercelRequest, response: VercelRespons
     json(response, 200, { session: null });
     return;
   }
+
+  await touchProfileSession(user.id);
 
   json(response, 200, {
     session: {
@@ -471,6 +482,7 @@ async function handleBillingCheckout(request: VercelRequest, response: VercelRes
       return;
     }
 
+    await recordApplicationError({ category: 'payments', message: error instanceof Error ? error.message : 'Erro ao criar checkout', page: '/api/billing/checkout', ...getErrorRequestContext(request) }).catch(() => undefined);
     console.error('Erro ao criar checkout Mercado Pago:', error);
     json(response, 400, { error: error instanceof Error ? error.message : 'Não foi possível iniciar o pagamento.' });
   }
@@ -507,6 +519,7 @@ async function handleMercadoPagoWebhook(request: VercelRequest, response: Vercel
     await updateSubscriptionFromMercadoPago(preapproval);
     json(response, 200, { ok: true });
   } catch (error) {
+    await recordApplicationError({ category: 'payments', message: error instanceof Error ? error.message : 'Erro no webhook', page: '/api/mercado-pago/webhook', ...getErrorRequestContext(request) }).catch(() => undefined);
     console.error('Erro no webhook Mercado Pago:', error);
     json(response, 500, { error: 'Não foi possível processar o webhook.' });
   }
@@ -554,6 +567,7 @@ async function handleAccount(request: VercelRequest, response: VercelResponse) {
       return;
     }
 
+    await recordApplicationError({ category: 'api', message: error instanceof Error ? error.message : 'Erro ao apagar conta', page: '/api/account', ...getErrorRequestContext(request) }).catch(() => undefined);
     console.error('Erro ao apagar conta:', error);
     json(response, 400, { error: 'Não foi possível apagar sua conta agora. Tente novamente em alguns instantes.' });
   }

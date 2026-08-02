@@ -124,3 +124,18 @@ https://app-usestudyflow.vercel.app/pagamento
 - Todas as consultas filtram pelo usuário autenticado no backend.
 - O frontend não escolhe `user_id` para acessar dados de outro usuário.
 - Nenhum token privado deve ser prefixado com `VITE_`.
+
+
+## Painel administrativo privado
+
+O painel do proprietário está disponível em `/admin`. Configure `ADMIN_EMAIL` e/ou `ADMIN_USER_ID` nas variáveis de ambiente da Vercel e faça um novo deploy. Todas as APIs administrativas validam a sessão no backend.
+
+A estrutura de banco necessária pode ser aplicada com `sql/admin-panel.sql`; ela também é criada de forma idempotente pelo backend. Consulte `ADMIN_IMPLEMENTATION.md` para a auditoria, métricas, endpoints e limitações financeiras.
+
+Comandos de validação:
+
+```bash
+npm run typecheck
+npm run lint
+npm run build
+```
