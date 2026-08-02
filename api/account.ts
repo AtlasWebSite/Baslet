@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { handleAdminRequest } from '../../server/admin-handler.js';
+import { handlePublicRequest } from '../server/public-handler.js';
 
 export default function handler(request: VercelRequest, response: VercelResponse) {
-  return handleAdminRequest(request, response);
+  return handlePublicRequest(request, response, 'account');
 }
