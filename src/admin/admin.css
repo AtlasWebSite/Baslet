@@ -6,24 +6,24 @@
    ========================================================================== */
 
 .admin-shell {
-  --admin-bg: #f6f6f5;
-  --admin-surface: #ffffff;
-  --admin-surface-muted: #f6f6f5;
-  --admin-ink: #0a0a0a;
-  --admin-ink-soft: #171717;
-  --admin-border: #e4e4e2;
-  --admin-border-strong: #d4d4d2;
-  --admin-text-muted: #6b6b68;
-  --admin-text-subtle: #8f8f8c;
-  --admin-positive: #15803d;
-  --admin-positive-bg: #f0f9f2;
-  --admin-negative: #b42318;
-  --admin-negative-bg: #fdf2f1;
-  --admin-focus: #1d4ed8;
-  --admin-shadow-sm: 0 1px 2px rgba(10, 10, 10, 0.04);
-  --admin-shadow-md: 0 4px 16px rgba(10, 10, 10, 0.08);
-  --admin-shadow-lift: 0 2px 10px rgba(10, 10, 10, 0.06);
-  --admin-radius: 2px;
+  --admin-bg: #000000;
+  --admin-surface: #090909;
+  --admin-surface-muted: #111111;
+  --admin-ink: #ffffff;
+  --admin-ink-soft: #e5e5e5;
+  --admin-border: #262626;
+  --admin-border-strong: #333333;
+  --admin-text-muted: #b3b3b3;
+  --admin-text-subtle: #8a8a8a;
+  --admin-positive: #d4d4d4;
+  --admin-positive-bg: #171717;
+  --admin-negative: #a3a3a3;
+  --admin-negative-bg: #111111;
+  --admin-focus: #ffffff;
+  --admin-shadow-sm: none;
+  --admin-shadow-md: none;
+  --admin-shadow-lift: none;
+  --admin-radius: 0px;
   --admin-ease: cubic-bezier(0.4, 0, 0.2, 1);
   --admin-font-ui: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --admin-font-mono: ui-monospace, "SF Mono", "Roboto Mono", "JetBrains Mono", Menlo, Consolas, monospace;
@@ -55,7 +55,7 @@
   outline-offset: 2px;
 }
 
-.admin-shell ::selection { background: var(--admin-ink); color: #fff; }
+.admin-shell ::selection { background: #ffffff; color: #000000; }
 
 .admin-shell *::-webkit-scrollbar { width: 10px; height: 10px; }
 .admin-shell *::-webkit-scrollbar-track { background: transparent; }
@@ -74,7 +74,7 @@
   width: 260px;
   flex-direction: column;
   background: var(--admin-ink);
-  color: #fff;
+  color: #000;
   border-right: 1px solid #262626;
 }
 
@@ -133,7 +133,7 @@
 }
 
 .admin-nav-item svg { flex-shrink: 0; opacity: .85; transition: opacity .15s var(--admin-ease); }
-.admin-nav-item:hover { background: #171717; color: #fff; }
+.admin-nav-item:hover { background: #171717; color: #ffffff; }
 .admin-nav-item:hover svg { opacity: 1; }
 .admin-nav-item.is-active { background: #fff; color: #000; border-left-color: #000; font-weight: 600; }
 .admin-nav-item.is-active svg { opacity: 1; }
@@ -252,7 +252,7 @@
 .admin-pagination button:not(:disabled):active,
 .admin-icon-button:active { transform: translateY(1px); }
 
-.admin-primary-button { background: var(--admin-ink); color: #fff; }
+.admin-primary-button { background: var(--admin-ink); color: #000; }
 .admin-primary-button:hover { background: #262626; }
 .admin-secondary-button { background: var(--admin-surface); color: var(--admin-ink); border-color: var(--admin-border-strong); }
 .admin-secondary-button:hover { border-color: var(--admin-ink); }
@@ -427,7 +427,7 @@
 }
 
 .admin-barchart__bar {
-  fill: #3b5bfd;
+  fill: #ffffff;
   transition: opacity .14s var(--admin-ease), filter .14s var(--admin-ease), transform .14s var(--admin-ease);
   transform-box: fill-box;
   transform-origin: bottom;
@@ -439,18 +439,18 @@
 
 .admin-barchart__datum.is-active .admin-barchart__bar {
   opacity: 1;
-  filter: brightness(1.12);
+  filter: none;
   transform: scaleY(1.015);
 }
 
 .admin-barchart__tooltip rect {
-  fill: #0f172a;
-  stroke: #334155;
+  fill: #000000;
+  stroke: #ffffff;
   stroke-width: 1;
 }
 
 .admin-barchart__tooltip text {
-  fill: #94a3b8;
+  fill: #d4d4d4;
   font-family: var(--admin-font-ui);
   font-size: 10px;
 }
@@ -493,7 +493,7 @@
 }
 
 .admin-donut__track {
-  stroke: #e5e7eb;
+  stroke: #262626;
 }
 
 .admin-donut__segment {
@@ -503,7 +503,7 @@
 
 .admin-donut__segment.is-active {
   stroke-width: 43;
-  filter: brightness(1.08);
+  filter: none;
 }
 
 .admin-donut__center-label {
@@ -555,7 +555,7 @@
   width: 10px;
   height: 10px;
   flex-shrink: 0;
-  border-radius: 50% !important;
+  border-radius: 0 !important;
 }
 
 .admin-donut__legend-item b {
@@ -725,7 +725,7 @@
   min-height: calc(100vh - 82px);
   margin: -26px;
   padding: 18px 18px 26px;
-  background: linear-gradient(180deg, #0e1728 0%, #111b2d 100%);
+  background: #000000;
   color: #f8fafc;
 }
 
@@ -741,10 +741,10 @@
   display: flex;
   flex-direction: column;
   padding: 18px 20px;
-  background: #030b1b;
-  border: 1px solid #22314b;
-  border-radius: 18px !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.03);
+  background: #050505;
+  border: 1px solid #2a2a2a;
+  border-radius: 0 !important;
+  box-shadow: none;
 }
 
 .admin-home-metric__icon {
@@ -753,14 +753,14 @@
   display: grid;
   place-items: center;
   margin-bottom: 26px;
-  background: #0d1830;
-  border: 1px solid #21304b;
-  border-radius: 14px !important;
-  color: #d7e2f1;
+  background: #111111;
+  border: 1px solid #2f2f2f;
+  border-radius: 0 !important;
+  color: #ffffff;
 }
 
 .admin-home-metric > span {
-  color: #8ec5ff;
+  color: #ffffff;
   font-size: 13px;
   font-weight: 500;
 }
@@ -789,17 +789,17 @@
   align-items: center;
   gap: 4px;
   padding: 5px 10px;
-  border-radius: 999px !important;
+  border-radius: 0 !important;
   font-family: var(--admin-font-mono);
   font-size: 10px;
   font-weight: 700;
   white-space: nowrap;
 }
 
-.admin-home-metric__value small.is-positive { background: rgba(15, 118, 110, .25); color: #34d399; }
-.admin-home-metric__value small.is-negative { background: rgba(127, 29, 29, .28); color: #fb7185; }
-.admin-home-metric__value small.is-neutral { background: #0f1c32; color: #8da1bf; }
-.admin-home-metric > p { margin: 8px 0 0; color: #6d83a5; font-size: 11px; text-align: right; }
+.admin-home-metric__value small.is-positive { background: #171717; color: #ffffff; }
+.admin-home-metric__value small.is-negative { background: #171717; color: #d4d4d4; }
+.admin-home-metric__value small.is-neutral { background: #171717; color: #bfbfbf; }
+.admin-home-metric > p { margin: 8px 0 0; color: #9a9a9a; font-size: 11px; text-align: right; }
 .admin-home-metric.is-unavailable { opacity: .72; }
 
 .admin-home__dashboard-grid {
@@ -811,11 +811,11 @@
 
 .admin-home-panel {
   min-width: 0;
-  background: #030b1b;
-  border: 1px solid #22314b;
-  border-radius: 18px !important;
+  background: #050505;
+  border: 1px solid #2a2a2a;
+  border-radius: 0 !important;
   overflow: hidden;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.03);
+  box-shadow: none;
 }
 
 .admin-home-panel > header {
@@ -825,11 +825,11 @@
   justify-content: space-between;
   gap: 18px;
   padding: 18px 24px;
-  border-bottom: 1px solid #1b2940;
+  border-bottom: 1px solid #262626;
 }
 
 .admin-home-panel h2 { margin: 0; color: #ffffff; font-size: 16px; font-weight: 700; letter-spacing: -.02em; }
-.admin-home-panel header p { margin: 8px 0 0; color: #d3def0; font-size: 12px; }
+.admin-home-panel header p { margin: 8px 0 0; color: #bdbdbd; font-size: 12px; }
 .admin-home-panel__body { padding: 22px 24px 24px; }
 
 .admin-home-periods {
@@ -837,28 +837,28 @@
   align-items: center;
   gap: 6px;
   padding: 5px;
-  background: #111e33;
-  border-radius: 12px !important;
+  background: #111111;
+  border-radius: 0 !important;
 }
 
 .admin-home-periods button {
   min-height: 40px;
   padding: 0 14px;
   border: 0;
-  border-radius: 9px !important;
+  border-radius: 0 !important;
   background: transparent;
-  color: #98abc5;
+  color: #a3a3a3;
   font: inherit;
   font-size: 12px;
   cursor: pointer;
 }
 
-.admin-home-periods button:hover { color: #fff; }
-.admin-home-periods button.is-active { background: #24324a; color: #fff; }
+.admin-home-periods button:hover { background: #262626; color: #ffffff; }
+.admin-home-periods button.is-active { background: #ffffff; color: #000000; }
 
 .admin-home .admin-chart {
   min-height: 330px;
-  color: #e2e8f0;
+  color: #ffffff;
 }
 
 .admin-home .admin-barchart__svg {
@@ -869,14 +869,14 @@
 }
 
 .admin-home .admin-barchart__grid-line {
-  stroke: #172238;
+  stroke: #262626;
   stroke-width: 1;
   shape-rendering: crispEdges;
 }
 
 .admin-home .admin-barchart__y-label,
 .admin-home .admin-barchart__x-label {
-  fill: #7890b2;
+  fill: #a3a3a3;
   font-family: var(--admin-font-ui);
   font-size: 11px;
   font-weight: 500;
@@ -887,7 +887,7 @@
 }
 
 .admin-home .admin-barchart__bar {
-  fill: #3f5bf6;
+  fill: #ffffff;
   opacity: 1;
   filter: none;
   transition: fill .14s ease, opacity .14s ease;
@@ -899,7 +899,7 @@
 
 .admin-home .admin-barchart__datum.is-active .admin-barchart__bar,
 .admin-home .admin-barchart__datum:hover .admin-barchart__bar {
-  fill: #5b73ff;
+  fill: #d4d4d4;
   opacity: 1;
   transform: none;
   filter: none;
@@ -910,13 +910,13 @@
 }
 
 .admin-home .admin-barchart__tooltip rect {
-  fill: #0d1729;
-  stroke: #2a3954;
+  fill: #000000;
+  stroke: #ffffff;
   stroke-width: 1;
 }
 
 .admin-home .admin-barchart__tooltip text {
-  fill: #9fb0c9;
+  fill: #d4d4d4;
   font-family: var(--admin-font-ui);
   font-size: 11px;
 }
@@ -953,7 +953,7 @@
 
 .admin-home .admin-donut__track {
   fill: none;
-  stroke: #121d31;
+  stroke: #262626;
   stroke-width: 38;
 }
 
@@ -970,7 +970,7 @@
 .admin-home .admin-donut__segment:hover {
   stroke-width: 38;
   opacity: 1;
-  filter: brightness(1.08);
+  filter: none;
 }
 
 .admin-home .admin-donut__center-label {
@@ -983,7 +983,7 @@
 }
 
 .admin-home .admin-donut__center-value {
-  fill: #a9b9d3;
+  fill: #d4d4d4;
   font-family: var(--admin-font-ui);
   font-size: 15px;
   font-weight: 500;
@@ -1006,7 +1006,7 @@
   padding: 0;
   border: 0;
   background: transparent;
-  color: #a6b6ce;
+  color: #b3b3b3;
   font: inherit;
   font-size: 12px;
   cursor: pointer;
@@ -1015,11 +1015,11 @@
 .admin-home .admin-donut__legend-item i {
   width: 10px;
   height: 10px;
-  border-radius: 50% !important;
+  border-radius: 0 !important;
 }
 
 .admin-home .admin-donut__legend-item span {
-  color: #a6b6ce;
+  color: #b3b3b3;
   font-size: 12px;
 }
 
