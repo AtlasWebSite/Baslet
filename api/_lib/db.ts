@@ -7,10 +7,7 @@ let schemaPromise: Promise<void> | undefined;
 export async function ensureSchema() {
   if (schemaPromise) return schemaPromise;
 
-  schemaPromise = createSchema().catch((error) => {
-    schemaPromise = undefined;
-    throw error;
-  });
+  schemaPromise = createSchema();
   return schemaPromise;
 }
 
@@ -214,14 +211,10 @@ export async function upsertProfileFromSession(user: SessionUser) {
     returning *
   `;
 
-  try {
-    await sql`
-      insert into activity_events (id, user_id, event_type, resource_type, resource_id, metadata)
-      values (${randomUUID()}, ${user.id}, 'user_login', 'profile', ${user.id}, '{}'::jsonb)
-    `;
-  } catch (error) {
-    console.error('Não foi possível registrar o login no histórico de atividade:', error instanceof Error ? error.message : error);
-  }
+  await sql`
+    insert into activity_events (id, user_id, event_type, resource_type, resource_id, metadata)
+    values (${randomUUID()}, ${user.id}, 'user_login', 'profile', ${user.id}, '{}'::jsonb)
+  `;
   return rows[0];
 }
 
@@ -229,16 +222,12 @@ export async function upsertProfileFromSession(user: SessionUser) {
 export async function touchProfileSession(userId: string) {
   await ensureSchema();
   await sql`update profiles set last_login_at = now(), updated_at = now() where id = ${userId}`;
-  try {
-    await sql`
-      insert into activity_events (id, user_id, event_type, resource_type, resource_id, metadata)
-      select ${randomUUID()}, ${userId}, 'session_started', 'session', null, '{}'::jsonb
-      where not exists (
-        select 1 from activity_events
-        where user_id = ${userId} and event_type = 'session_started' and created_at >= now() - interval '15 minutes'
-      )
-    `;
-  } catch (error) {
-    console.error('Não foi possível registrar a sessão no histórico de atividade:', error instanceof Error ? error.message : error);
-  }
+  await sql`
+    insert into activity_events (id, user_id, event_type, resource_type, resource_id, metadata)
+    select ${randomUUID()}, ${userId}, 'session_started', 'session', null, '{}'::jsonb
+    where not exists (
+      select 1 from activity_events
+      where user_id = ${userId} and event_type = 'session_started' and created_at >= now() - interval '15 minutes'
+    )
+  `;
 }

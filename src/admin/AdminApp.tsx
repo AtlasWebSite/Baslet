@@ -128,17 +128,6 @@ function formatDate(value: string | null | undefined) {
   return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Sao_Paulo' }).format(new Date(value));
 }
 
-function formatSubscriptionStatus(value: string) {
-  return ({
-    active: 'Ativa',
-    pending: 'Pendente',
-    paused: 'Pausada',
-    cancelled: 'Cancelada',
-    rejected: 'Recusada',
-    inactive: 'Inativa',
-  } as Record<string, string>)[value] ?? value;
-}
-
 function formatMetric(value: number | null, format: AdminMetric['format']) {
   if (value === null) return 'Dados indisponíveis';
   if (format === 'currency') return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
@@ -206,7 +195,7 @@ export function AdminApp({ authenticated, authError, authLoading }: AdminAppProp
             <div><span>StudyFlow / Admin</span><h1>{title}</h1></div>
           </div>
           <div className="admin-topbar__actions">
-            <label className="admin-global-search"><Search size={16} /><input value={globalSearch} onChange={(event: ChangeEvent<HTMLInputElement>) => setGlobalSearch(event.target.value)} onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => { if (event.key !== 'Enter' || !globalSearch.trim()) return; navigateTo(`/admin/usuarios${buildAdminQuery({ search: globalSearch.trim() })}`); }} placeholder="Buscar usuário" /></label>
+            <label className="admin-global-search"><Search size={16} /><input value={globalSearch} onChange={(event: ChangeEvent<HTMLInputElement>) => setGlobalSearch(event.target.value)} onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => { if (event.key !== 'Enter' || !globalSearch.trim()) return; window.location.assign(`/admin/usuarios${buildAdminQuery({ search: globalSearch.trim() })}`); }} placeholder="Buscar usuário" /></label>
             <label className="admin-period-field">
               <span>Período</span>
               <select value={period} onChange={(event: ChangeEvent<HTMLSelectElement>) => setPeriod(event.target.value)}>
@@ -231,7 +220,7 @@ function AdminSidebar({ pathname, mobileOpen, onClose }: { pathname: string; mob
     <>
       {mobileOpen && <button className="admin-backdrop" onClick={onClose} aria-label="Fechar menu" />}
       <aside className={`admin-sidebar ${mobileOpen ? 'is-open' : ''}`}>
-        <div className="admin-sidebar__brand"><div className="admin-brand-mark"><img src="/favicon.png" alt="" /></div><div><strong>StudyFlow</strong><span>Admin privado</span></div><button className="admin-icon-button admin-sidebar__close" onClick={onClose}><X size={18} /></button></div>
+        <div className="admin-sidebar__brand"><div className="admin-brand-mark">SF</div><div><strong>StudyFlow</strong><span>Admin privado</span></div><button className="admin-icon-button admin-sidebar__close" onClick={onClose}><X size={18} /></button></div>
         <nav>
           {navigation.map((item) => {
             const Icon = item.icon;
@@ -310,7 +299,7 @@ function UsersPage({ refreshKey }: { refreshKey: number }) {
       <div className="admin-toolbar">
         <label className="admin-search"><Search size={17} /><input value={search} onChange={(event: ChangeEvent<HTMLInputElement>) => setSearch(event.target.value)} placeholder="Nome, e-mail, ID ou assinatura" /></label>
         <select value={filter} onChange={(event: ChangeEvent<HTMLSelectElement>) => { setFilter(event.target.value); setPage(1); }}>
-          <option value="all">Todos</option><option value="premium">Premium</option><option value="free">Gratuitos</option><option value="active">Ativos</option><option value="inactive">Inativos pelo limite configurado</option><option value="inactive_7d">Sem acesso há 7 dias</option><option value="inactive_14d">Sem acesso há 14 dias</option><option value="inactive_30d">Sem acesso há 30 dias</option><option value="never_accessed">Nunca acessaram</option><option value="new">Novos em 7 dias</option><option value="high_engagement">Alto engajamento (10+ eventos)</option><option value="low_engagement">Baixo engajamento (até 2 eventos)</option><option value="cancelled">Assinatura cancelada</option><option value="rejected">Assinatura recusada</option>
+          <option value="all">Todos</option><option value="premium">Premium</option><option value="free">Gratuitos</option><option value="active">Ativos</option><option value="inactive">Inativos pelo limite configurado</option><option value="inactive_7d">Sem acesso há 7 dias</option><option value="inactive_14d">Sem acesso há 14 dias</option><option value="never_accessed">Nunca acessaram</option><option value="new">Novos em 7 dias</option><option value="high_engagement">Alto engajamento (10+ eventos)</option><option value="low_engagement">Baixo engajamento (até 2 eventos)</option><option value="cancelled">Assinatura cancelada</option><option value="rejected">Assinatura recusada</option>
         </select>
         <select value={`${sort}:${direction}`} onChange={(event: ChangeEvent<HTMLSelectElement>) => { const [nextSort, nextDirection] = event.target.value.split(':'); setSort(nextSort); setDirection(nextDirection); setPage(1); }}><option value="created:desc">Mais recentes</option><option value="created:asc">Mais antigos</option><option value="name:asc">Nome A–Z</option><option value="name:desc">Nome Z–A</option><option value="last_login:desc">Acesso mais recente</option><option value="last_login:asc">Acesso mais antigo</option></select>
         <a className="admin-secondary-button" href={`/api/admin/report${buildAdminQuery({ type: 'users', search: debouncedSearch, filter: filter === 'all' ? undefined : filter })}`}><Download size={16} /> Exportar CSV</a>
@@ -325,35 +314,27 @@ function UsersPage({ refreshKey }: { refreshKey: number }) {
 function UsersTable({ result, page, onPage }: { result: AdminPaginatedUsers; page: number; onPage: (page: number) => void }) {
   if (!result.users.length) return <AdminEmpty title="Nenhum usuário encontrado" description="Altere os filtros ou aguarde novos cadastros." />;
   return <AdminPanel title={`${result.total} usuários`} subtitle="Busca, filtro e paginação executados no servidor">
-    <div className="admin-table-wrap"><table><thead><tr><th>Usuário</th><th>ID / status</th><th>Plano</th><th>Cadastro</th><th>Último acesso</th><th>Dias sem acessar</th><th>Progresso médio</th><th>Flashcards</th><th>Mapas</th><th>Testes</th><th>Sessões</th></tr></thead><tbody>
-      {result.users.map((user) => <tr key={user.id} onClick={() => navigateTo(`/admin/usuarios/${encodeURIComponent(user.id)}`)} className="admin-clickable-row"><td><strong>{user.name}</strong><span>{user.email}</span></td><td><code>{user.id}</code><span>{user.accountStatus}</span></td><td><strong>{user.plan}</strong><span>{formatSubscriptionStatus(user.subscriptionStatus)}</span></td><td>{formatDate(user.createdAt)}</td><td>{formatDate(user.lastLoginAt)}</td><td>{daysWithoutAccess(user.lastLoginAt)}</td><td>{formatMetric(user.progressPercentage, 'percent')}</td><td>{user.flashcards}</td><td>{user.mentalMaps}</td><td>{user.quizzes}</td><td>{user.sessions}</td></tr>)}
+    <div className="admin-table-wrap"><table><thead><tr><th>Usuário</th><th>Plano</th><th>Cadastro</th><th>Último acesso</th><th>Dias sem acessar</th><th>Progresso médio</th><th>Flashcards</th><th>Mapas</th><th>Testes</th><th>Sessões</th></tr></thead><tbody>
+      {result.users.map((user) => <tr key={user.id} onClick={() => navigateTo(`/admin/usuarios/${encodeURIComponent(user.id)}`)} className="admin-clickable-row"><td><strong>{user.name}</strong><span>{user.email}</span></td><td><strong>{user.plan}</strong><span>{user.subscriptionStatus}</span></td><td>{formatDate(user.createdAt)}</td><td>{formatDate(user.lastLoginAt)}</td><td>{daysWithoutAccess(user.lastLoginAt)}</td><td>{formatMetric(user.progressPercentage, 'percent')}</td><td>{user.flashcards}</td><td>{user.mentalMaps}</td><td>{user.quizzes}</td><td>{user.sessions}</td></tr>)}
     </tbody></table></div><Pagination page={page} pageSize={result.pageSize} total={result.total} onPage={onPage} />
   </AdminPanel>;
 }
 
 function UserDetailPage({ userId, refreshKey }: { userId: string; refreshKey: number }) {
-  const [copyFeedback, setCopyFeedback] = useState('');
+  const [copySuccess, setCopySuccess] = useState(false);
   const state = useAsyncData(() => getAdminUser(userId), [userId, refreshKey]);
   if (state.loading) return <AdminSkeleton />;
   if (state.error || !state.data) return <AdminError message={state.error || 'Usuário não encontrado.'} onRetry={state.retry} />;
   const user = state.data;
-  const copyId = async () => {
-    try {
-      await navigator.clipboard.writeText(user.id);
-      setCopyFeedback('ID copiado');
-    } catch {
-      setCopyFeedback('Não foi possível copiar');
-    }
-    window.setTimeout(() => setCopyFeedback(''), 1800);
-  };
+  const copyId = async () => { await navigator.clipboard.writeText(user.id); setCopySuccess(true); window.setTimeout(() => setCopySuccess(false), 1800); };
   return <div className="admin-stack">
     <button className="admin-text-button" onClick={() => navigateTo('/admin/usuarios')}><ArrowLeft size={16} /> Voltar para usuários</button>
-    <AdminPanel title={user.name} subtitle={user.email} action={<button className="admin-secondary-button" onClick={() => void copyId()}>{copyFeedback || 'Copiar ID'}</button>}>
+    <AdminPanel title={user.name} subtitle={user.email} action={<button className="admin-secondary-button" onClick={() => void copyId()}>{copySuccess ? 'ID copiado' : 'Copiar ID'}</button>}>
       <div className="admin-detail-grid"><Detail label="ID" value={user.id} /><Detail label="Cadastro" value={formatDate(user.createdAt)} /><Detail label="Último acesso" value={formatDate(user.lastLoginAt)} /><Detail label="Status" value={user.accountStatus} /></div>
     </AdminPanel>
-    <div className="admin-metric-grid">{Object.entries(user.stats).map(([key, value]) => <MetricCard key={key} metric={{ id: key, label: statLabel(key), value, previous: null, changePercent: null, format: key === 'quizAccuracy' || key === 'progressPercentage' ? 'percent' : 'number', explanation: 'Calculado a partir dos registros reais do usuário.', status: 'available' }} />)}</div>
+    <div className="admin-metric-grid">{Object.entries(user.stats).map(([key, value]) => <MetricCard key={key} metric={{ id: key, label: statLabel(key), value, previous: null, changePercent: null, format: key === 'quizAccuracy' ? 'percent' : 'number', explanation: 'Calculado a partir dos registros reais do usuário.', status: 'available' }} />)}</div>
     <div className="admin-grid-2">
-      <AdminPanel title="Assinatura" subtitle="Status sincronizado com a estrutura atual do Mercado Pago">{user.subscription ? <div className="admin-summary-list"><Detail label="Plano" value={user.subscription.planName} /><Detail label="Status" value={formatSubscriptionStatus(user.subscription.status)} /><Detail label="Valor" value={formatMetric(user.subscription.amount, 'currency')} /><Detail label="ID externo" value={user.subscription.externalId ?? 'Não informado'} /><Detail label="Próxima cobrança" value={formatDate(user.subscription.nextPaymentAt)} /></div> : <AdminEmpty title="Sem assinatura" description="Este usuário não possui registro de assinatura." />}</AdminPanel>
+      <AdminPanel title="Assinatura" subtitle="Status sincronizado com a estrutura atual do Mercado Pago">{user.subscription ? <div className="admin-summary-list"><Detail label="Plano" value={user.subscription.planName} /><Detail label="Status" value={user.subscription.status} /><Detail label="Valor" value={formatMetric(user.subscription.amount, 'currency')} /><Detail label="ID externo" value={user.subscription.externalId ?? 'Não informado'} /><Detail label="Próxima cobrança" value={formatDate(user.subscription.nextPaymentAt)} /></div> : <AdminEmpty title="Sem assinatura" description="Este usuário não possui registro de assinatura." />}</AdminPanel>
       <AdminPanel title="Pagamentos" subtitle="Histórico financeiro individual"> <AdminUnavailable reason={user.payments.reason} /></AdminPanel>
     </div>
     <AdminPanel title="Linha do tempo" subtitle="Eventos registrados a partir da implantação da instrumentação">{user.activity.length ? <div className="admin-timeline">{user.activity.map((event, index) => <div key={`${event.createdAt}-${index}`}><span>{formatDate(event.createdAt)}</span><strong>{event.type}</strong><small>{event.resourceType ?? 'atividade'}</small></div>)}</div> : <AdminEmpty title="Sem eventos registrados" description="O histórico começará a ser preenchido após a implantação." />}</AdminPanel>
@@ -381,7 +362,7 @@ function SubscriptionsPage({ refreshKey }: { refreshKey: number }) {
 
 function SubscriptionsTable({ result, page, onPage }: { result: AdminPaginatedSubscriptions; page: number; onPage: (page: number) => void }) {
   if (!result.subscriptions.length) return <AdminEmpty title="Nenhuma assinatura encontrada" description="Não existem registros para os filtros selecionados." />;
-  return <AdminPanel title={`${result.total} assinaturas`} subtitle="Dados reais da tabela subscriptions"><div className="admin-table-wrap"><table><thead><tr><th>Usuário</th><th>Status</th><th>Valor</th><th>Início</th><th>Próxima cobrança</th><th>Cancelamento</th><th>ID Mercado Pago</th></tr></thead><tbody>{result.subscriptions.map((item) => <tr key={item.id}><td><strong>{item.userName}</strong><span>{item.email}</span></td><td>{formatSubscriptionStatus(item.status)}</td><td>{formatMetric(item.amount, 'currency')}</td><td>{formatDate(item.startedAt)}</td><td>{formatDate(item.nextPaymentAt)}</td><td>{formatDate(item.cancelledAt)}</td><td><code>{item.externalId ?? '—'}</code></td></tr>)}</tbody></table></div><Pagination page={page} pageSize={result.pageSize} total={result.total} onPage={onPage} /></AdminPanel>;
+  return <AdminPanel title={`${result.total} assinaturas`} subtitle="Dados reais da tabela subscriptions"><div className="admin-table-wrap"><table><thead><tr><th>Usuário</th><th>Status</th><th>Valor</th><th>Início</th><th>Próxima cobrança</th><th>Cancelamento</th><th>ID Mercado Pago</th></tr></thead><tbody>{result.subscriptions.map((item) => <tr key={item.id}><td><strong>{item.userName}</strong><span>{item.email}</span></td><td>{item.status}</td><td>{formatMetric(item.amount, 'currency')}</td><td>{formatDate(item.startedAt)}</td><td>{formatDate(item.nextPaymentAt)}</td><td>{formatDate(item.cancelledAt)}</td><td><code>{item.externalId ?? '—'}</code></td></tr>)}</tbody></table></div><Pagination page={page} pageSize={result.pageSize} total={result.total} onPage={onPage} /></AdminPanel>;
 }
 
 interface PaymentsResponse { payments: { available: boolean; reason: string; implementationRequired: string } }
@@ -409,13 +390,13 @@ function EngagementPage({ periodSelection, refreshKey }: { periodSelection: Admi
   return <div className="admin-stack"><AdminNotice>{data.notice}</AdminNotice><div className="admin-metric-grid">{metrics.map((item) => <MetricCard key={item.id} metric={item} />)}</div><div className="admin-grid-2"><AdminPanel title="Ativos por dia"><LineChart points={data.activeSeries} /></AdminPanel><AdminPanel title="Usuários mais ativos"><SimpleUserList users={data.topUsers.map((user) => ({ ...user, value: `${user.events} eventos` }))} /></AdminPanel></div><AdminPanel title="Usuários sem acesso recente"><SimpleUserList users={data.abandonedUsers.map((user) => ({ ...user, value: formatDate(user.lastLoginAt) }))} /></AdminPanel></div>;
 }
 
-interface ResourcesResponse { resources: { notice: string; flashcards: { created: number; reviewed: number; uniqueUsers: number }; mentalMaps: { created: number; uniqueUsers: number }; quizzes: { completed: number; uniqueUsers: number; averageAccuracy: number }; ai: { available: boolean; reason: string }; series: Array<{ date: string; flashcards: number; mentalMaps: number; quizzes: number }> } }
+interface ResourcesResponse { resources: { flashcards: { created: number; reviewed: number; uniqueUsers: number }; mentalMaps: { created: number; uniqueUsers: number }; quizzes: { completed: number; uniqueUsers: number; averageAccuracy: number }; ai: { available: boolean; reason: string }; series: Array<{ date: string; flashcards: number; mentalMaps: number; quizzes: number }> } }
 function ResourcesPage({ periodSelection, refreshKey }: { periodSelection: AdminPeriodSelection; refreshKey: number }) {
   const state = useAsyncData(() => getAdminSection<ResourcesResponse>('resources', periodSelection), [periodSelection.period, periodSelection.start, periodSelection.end, refreshKey]);
   if (state.loading) return <AdminSkeleton />;
   if (state.error || !state.data) return <AdminError message={state.error || 'Erro ao carregar.'} onRetry={state.retry} />;
   const data = state.data.resources;
-  return <div className="admin-stack"><AdminNotice>{data.notice}</AdminNotice><div className="admin-grid-3"><AdminPanel title="Flashcards"><div className="admin-summary-list"><Detail label="Criados" value={String(data.flashcards.created)} /><Detail label="Revisões" value={String(data.flashcards.reviewed)} /><Detail label="Usuários únicos" value={String(data.flashcards.uniqueUsers)} /></div></AdminPanel><AdminPanel title="Mapas mentais"><div className="admin-summary-list"><Detail label="Criados" value={String(data.mentalMaps.created)} /><Detail label="Usuários únicos" value={String(data.mentalMaps.uniqueUsers)} /></div></AdminPanel><AdminPanel title="Testes"><div className="admin-summary-list"><Detail label="Realizados" value={String(data.quizzes.completed)} /><Detail label="Usuários únicos" value={String(data.quizzes.uniqueUsers)} /><Detail label="Média de acertos" value={formatMetric(data.quizzes.averageAccuracy, 'percent')} /></div></AdminPanel></div><div className="admin-grid-3"><AdminPanel title="Evolução de flashcards"><LineChart points={data.series.map((point) => ({ date: point.date, value: point.flashcards }))} /></AdminPanel><AdminPanel title="Evolução de mapas mentais"><LineChart points={data.series.map((point) => ({ date: point.date, value: point.mentalMaps }))} /></AdminPanel><AdminPanel title="Evolução de testes"><LineChart points={data.series.map((point) => ({ date: point.date, value: point.quizzes }))} /></AdminPanel></div><AdminPanel title="Inteligência artificial"><AdminUnavailable reason={data.ai.reason} /></AdminPanel></div>;
+  return <div className="admin-stack"><div className="admin-grid-3"><AdminPanel title="Flashcards"><div className="admin-summary-list"><Detail label="Criados" value={String(data.flashcards.created)} /><Detail label="Revisões" value={String(data.flashcards.reviewed)} /><Detail label="Usuários únicos" value={String(data.flashcards.uniqueUsers)} /></div></AdminPanel><AdminPanel title="Mapas mentais"><div className="admin-summary-list"><Detail label="Criados" value={String(data.mentalMaps.created)} /><Detail label="Usuários únicos" value={String(data.mentalMaps.uniqueUsers)} /></div></AdminPanel><AdminPanel title="Testes"><div className="admin-summary-list"><Detail label="Realizados" value={String(data.quizzes.completed)} /><Detail label="Usuários únicos" value={String(data.quizzes.uniqueUsers)} /><Detail label="Média de acertos" value={formatMetric(data.quizzes.averageAccuracy, 'percent')} /></div></AdminPanel></div><AdminPanel title="Inteligência artificial"><AdminUnavailable reason={data.ai.reason} /></AdminPanel></div>;
 }
 
 interface FinanceResponse { finance: { contracted: { activeSubscriptions: number; pendingSubscriptions: number; cancelledSubscriptions: number; rejectedSubscriptions: number; mrr: number; averageContract: number }; realizedRevenue: { available: boolean; reason: string }; aiCosts: { available: boolean; reason: string } } }
@@ -466,7 +447,6 @@ function SettingsPage({ refreshKey }: { refreshKey: number }) {
   const [saveError, setSaveError] = useState('');
   useEffect(() => { if (state.data) setValues(state.data.settings.values); }, [state.data]);
   const save = async () => {
-    if (!window.confirm('Salvar estas configurações administrativas?')) return;
     setSaving(true); setSuccess(''); setSaveError('');
     try { const result = await updateAdminSettings(values); setValues(result.settings.values); setSuccess('Configurações salvas e registradas na auditoria.'); } catch (error) { setSaveError(error instanceof Error ? error.message : 'Não foi possível salvar.'); } finally { setSaving(false); }
   };

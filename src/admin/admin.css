@@ -353,10 +353,3 @@
   .admin-custom-period label { flex: 1; }
   .admin-custom-period input { width: 100%; }
 }
-
-.admin-brand-mark img {
-  width: 26px;
-  height: 26px;
-  display: block;
-  object-fit: contain;
-}

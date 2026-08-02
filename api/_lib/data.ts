@@ -2,14 +2,6 @@ import { randomUUID } from 'node:crypto';
 import { sql } from '@vercel/postgres';
 import { ensureSchema } from './db.js';
 import { recordActivityEvent } from './activity.js';
-
-async function recordActivitySafely(input: Parameters<typeof recordActivityEvent>[0]) {
-  try {
-    await recordActivityEvent(input);
-  } catch (error) {
-    console.error('Não foi possível registrar o evento de atividade:', error instanceof Error ? error.message : error);
-  }
-}
 import type { AppSubscriptionStatus, MercadoPagoPreapproval } from './mercadoPago.js';
 import {
   getMercadoPagoAmount,
@@ -215,7 +207,7 @@ export async function createStudySetForUser(user: SessionUser, draft: Record<str
     `;
   }
 
-  await recordActivitySafely({ userId: user.id, eventType: 'study_set_created', resourceType: 'study_set', resourceId: studySetId, metadata: { flashcards: cards.length } });
+  await recordActivityEvent({ userId: user.id, eventType: 'study_set_created', resourceType: 'study_set', resourceId: studySetId, metadata: { flashcards: cards.length } });
   const studySets = await getStudySets(user);
   return studySets.find((studySet) => studySet.id === String(createdSet.rows[0].id));
 }
@@ -282,7 +274,7 @@ export async function saveProgress(user: SessionUser, payload: Record<string, un
           updated_at = now()
       where id = ${String(existing.rows[0].id)} and user_id = ${user.id}
     `;
-    await recordActivitySafely({ userId: user.id, eventType: 'flashcard_reviewed', resourceType: 'flashcard', resourceId: flashcardId, metadata: { studySetId, mastery } });
+    await recordActivityEvent({ userId: user.id, eventType: 'flashcard_reviewed', resourceType: 'flashcard', resourceId: flashcardId, metadata: { studySetId, mastery } });
     return;
   }
 
@@ -290,7 +282,7 @@ export async function saveProgress(user: SessionUser, payload: Record<string, un
     insert into study_progress (id, user_id, study_set_id, flashcard_id, status, times_seen, times_correct, times_wrong, last_reviewed_at)
     values (${randomUUID()}, ${user.id}, ${studySetId}, ${flashcardId}, ${status}, 1, ${mastery === 3 ? 1 : 0}, ${mastery === 1 ? 1 : 0}, now())
   `;
-  await recordActivitySafely({ userId: user.id, eventType: 'flashcard_reviewed', resourceType: 'flashcard', resourceId: flashcardId, metadata: { studySetId, mastery } });
+  await recordActivityEvent({ userId: user.id, eventType: 'flashcard_reviewed', resourceType: 'flashcard', resourceId: flashcardId, metadata: { studySetId, mastery } });
 }
 
 export async function saveQuiz(user: SessionUser, payload: Record<string, unknown>) {
@@ -304,7 +296,7 @@ export async function saveQuiz(user: SessionUser, payload: Record<string, unknow
     insert into quiz_results (id, user_id, study_set_id, score, total_questions, correct_answers, wrong_answers)
     values (${randomUUID()}, ${user.id}, ${studySetId}, ${score}, ${total}, ${score}, ${Math.max(total - score, 0)})
   `;
-  await recordActivitySafely({ userId: user.id, eventType: 'test_completed', resourceType: 'study_set', resourceId: studySetId, metadata: { score, total } });
+  await recordActivityEvent({ userId: user.id, eventType: 'test_completed', resourceType: 'study_set', resourceId: studySetId, metadata: { score, total } });
 }
 
 function mapMentalMap(row: Record<string, unknown>) {
@@ -351,7 +343,7 @@ export async function createMentalMapForUser(user: SessionUser, payload: Record<
     returning *
   `;
 
-  await recordActivitySafely({ userId: user.id, eventType: 'mind_map_created', resourceType: 'mental_map', resourceId: id, metadata: { studySetId, mode } });
+  await recordActivityEvent({ userId: user.id, eventType: 'mind_map_created', resourceType: 'mental_map', resourceId: id, metadata: { studySetId, mode } });
   return mapMentalMap(rows[0]);
 }
 
@@ -435,7 +427,7 @@ export async function saveMercadoPagoSubscriptionForUser(user: SessionUser, prea
     returning *
   `;
 
-  await recordActivitySafely({ userId: user.id, eventType: 'subscription_started', resourceType: 'subscription', resourceId: String(rows[0].id), metadata: { status: input.status } });
+  await recordActivityEvent({ userId: user.id, eventType: 'subscription_started', resourceType: 'subscription', resourceId: String(rows[0].id), metadata: { status: input.status } });
   return mapSubscription(rows[0]);
 }
 
@@ -524,7 +516,7 @@ export async function cancelUserSubscription(user: SessionUser) {
   const existing = await sql`select id from subscriptions where user_id = ${user.id} limit 1`;
   if (!existing.rows[0]) return;
 
-  await recordActivitySafely({ userId: user.id, eventType: 'subscription_cancelled', resourceType: 'subscription', resourceId: String(existing.rows[0].id) });
+  await recordActivityEvent({ userId: user.id, eventType: 'subscription_cancelled', resourceType: 'subscription', resourceId: String(existing.rows[0].id) });
 
   await sql`
     update subscriptions

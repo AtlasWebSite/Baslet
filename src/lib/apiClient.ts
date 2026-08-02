@@ -10,7 +10,7 @@ async function parseResponse<T>(response: Response): Promise<T> {
 
   if (response.ok) return payload as T;
 
-  const message = payload?.error ?? 'Não foi possível concluir a solicitação.';
+  const message = payload?.error ?? `A API respondeu com erro ${response.status}. Verifique o deploy das funções e as variáveis da Vercel.`;
   throw new ApiError(message, response.status);
 }
 

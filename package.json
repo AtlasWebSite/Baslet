@@ -7,9 +7,9 @@
     "dev": "vercel dev",
     "dev:vite": "vite",
     "build": "tsc -b && tsc --noEmit -p tsconfig.api.json && vite build",
+    "typecheck": "tsc -b && tsc --noEmit -p tsconfig.api.json",
     "lint": "eslint .",
-    "preview": "vite preview",
-    "typecheck": "tsc -b && tsc --noEmit -p tsconfig.api.json"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@vercel/postgres": "^0.10.0",

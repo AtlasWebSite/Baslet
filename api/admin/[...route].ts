@@ -52,10 +52,6 @@ function safeFileName(type: string) {
   return allowed.has(type) ? type : null;
 }
 
-function isValidIdentifier(value: string | undefined) {
-  return Boolean(value && value.length <= 200 && /^[A-Za-z0-9._:@-]+$/.test(value));
-}
-
 export default async function handler(request: VercelRequest, response: VercelResponse) {
   const [resource, id] = getSegments(request);
   let admin;
@@ -70,9 +66,6 @@ export default async function handler(request: VercelRequest, response: VercelRe
     json(response, 500, { error: 'Não foi possível validar o acesso administrativo.' });
     return;
   }
-
-  response.setHeader('Cache-Control', 'no-store, private');
-  response.setHeader('X-Content-Type-Options', 'nosniff');
 
   try {
     if ((!resource || resource === 'session') && request.method === 'GET') {
@@ -91,10 +84,6 @@ export default async function handler(request: VercelRequest, response: VercelRe
     }
 
     if (resource === 'users' && id && request.method === 'GET') {
-      if (!isValidIdentifier(id)) {
-        json(response, 400, { error: 'ID de usuário inválido.' });
-        return;
-      }
       const user = await getAdminUser(id);
       if (!user) {
         json(response, 404, { error: 'Usuário não encontrado.' });
@@ -141,10 +130,6 @@ export default async function handler(request: VercelRequest, response: VercelRe
     }
 
     if (resource === 'errors' && id && request.method === 'PUT') {
-      if (!isValidIdentifier(id)) {
-        json(response, 400, { error: 'ID de erro inválido.' });
-        return;
-      }
       const body = await readJsonBody<Record<string, unknown>>(request);
       const updated = await updateAdminErrorStatus(id, String(body.status ?? ''));
       await recordAdminAudit({ admin, action: 'update_error_status', targetType: 'application_error', targetId: id, result: 'success', metadata: { status: updated.status } });
@@ -181,7 +166,6 @@ export default async function handler(request: VercelRequest, response: VercelRe
       const csv = await buildAdminCsv(type, request.query);
       await recordAdminAudit({ admin, action: 'export_csv', targetType: type, result: 'success' });
       response.setHeader('Content-Type', 'text/csv; charset=utf-8');
-      response.setHeader('X-Export-Row-Limit', '50000');
       response.setHeader('Content-Disposition', `attachment; filename="studyflow-${type}-${new Date().toISOString().slice(0, 10)}.csv"`);
       response.status(200).send(`\uFEFF${csv}`);
       return;

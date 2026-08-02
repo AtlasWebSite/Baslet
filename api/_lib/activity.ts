@@ -2,16 +2,12 @@ import { createHash, randomUUID } from 'node:crypto';
 import { sql } from '@vercel/postgres';
 import { ensureSchema } from './db.js';
 
-const PRIVATE_KEYS = new Set(['password', 'token', 'secret', 'cookie', 'authorization', 'accesstoken', 'refreshtoken', 'cvv', 'cardnumber', 'clientsecret', 'authsecret']);
-
-function normalizeMetadataKey(key: string) {
-  return key.toLocaleLowerCase().replace(/[^a-z0-9]/g, '');
-}
+const PRIVATE_KEYS = new Set(['password', 'token', 'secret', 'cookie', 'authorization', 'access_token', 'refresh_token', 'cvv', 'card_number']);
 
 function sanitizeMetadata(metadata: Record<string, unknown>) {
   return Object.fromEntries(
     Object.entries(metadata)
-      .filter(([key]) => !PRIVATE_KEYS.has(normalizeMetadataKey(key)))
+      .filter(([key]) => !PRIVATE_KEYS.has(key.toLocaleLowerCase()))
       .slice(0, 20)
       .map(([key, value]) => {
         if (value === null || typeof value === 'boolean' || typeof value === 'number') return [key, value];
@@ -46,10 +42,7 @@ export async function recordApplicationError(input: {
   device?: string | null;
 }) {
   await ensureSchema();
-  const safeMessage = input.message
-    .replace(/Bearer\s+\S+/gi, 'Bearer [redacted]')
-    .replace(/([?&](?:token|secret|password|code)=)[^&\s]+/gi, '$1[redacted]')
-    .slice(0, 500);
+  const safeMessage = input.message.replace(/Bearer\s+\S+/gi, 'Bearer [redacted]').slice(0, 500);
   const fingerprint = createHash('sha256').update(`${input.category}:${safeMessage}:${input.page ?? ''}`).digest('hex');
   const details = JSON.stringify(sanitizeMetadata(input.details ?? {}));
 

@@ -15,28 +15,8 @@ function iso(date: Date) {
   return date.toISOString();
 }
 
-const ADMIN_TIME_ZONE = 'America/Sao_Paulo';
-const SAO_PAULO_MIDNIGHT_UTC_HOUR = 3;
-const ADMIN_PERIOD_KEYS = new Set<AdminPeriodKey>(['today', 'yesterday', '7d', '30d', '90d', 'month', 'previous_month', 'year', 'custom']);
-
-function saoPauloCalendarParts(date: Date) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: ADMIN_TIME_ZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(date);
-  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return { year: Number(values.year), month: Number(values.month), day: Number(values.day) };
-}
-
-function saoPauloMidnightUtc(year: number, monthIndex: number, day: number) {
-  return new Date(Date.UTC(year, monthIndex, day, SAO_PAULO_MIDNIGHT_UTC_HOUR));
-}
-
-function startOfAdminDay(date: Date) {
-  const parts = saoPauloCalendarParts(date);
-  return saoPauloMidnightUtc(parts.year, parts.month - 1, parts.day);
+function startOfUtcDay(date: Date) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }
 
 function addDays(date: Date, days: number) {
@@ -53,10 +33,9 @@ function addMonths(date: Date, months: number) {
 
 export function resolveAdminPeriod(query: Record<string, string | string[] | undefined>): AdminPeriod {
   const raw = Array.isArray(query.period) ? query.period[0] : query.period;
-  const requestedKey = (raw ?? '30d') as AdminPeriodKey;
-  const key: AdminPeriodKey = ADMIN_PERIOD_KEYS.has(requestedKey) ? requestedKey : '30d';
+  const key = (raw ?? '30d') as AdminPeriodKey;
   const now = new Date();
-  const today = startOfAdminDay(now);
+  const today = startOfUtcDay(now);
   let start = addDays(today, -29);
   let end = addDays(today, 1);
 
@@ -67,18 +46,17 @@ export function resolveAdminPeriod(query: Record<string, string | string[] | und
   }
   if (key === '7d') start = addDays(today, -6);
   if (key === '90d') start = addDays(today, -89);
-  if (key === 'month') start = saoPauloMidnightUtc(today.getUTCFullYear(), today.getUTCMonth(), 1);
+  if (key === 'month') start = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
   if (key === 'previous_month') {
-    end = saoPauloMidnightUtc(today.getUTCFullYear(), today.getUTCMonth(), 1);
+    end = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
     start = addMonths(end, -1);
   }
-  if (key === 'year') start = saoPauloMidnightUtc(today.getUTCFullYear(), 0, 1);
+  if (key === 'year') start = new Date(Date.UTC(today.getUTCFullYear(), 0, 1));
   if (key === 'custom') {
     const startValue = Array.isArray(query.start) ? query.start[0] : query.start;
     const endValue = Array.isArray(query.end) ? query.end[0] : query.end;
-    const datePattern = /^\d{4}-\d{2}-\d{2}$/;
-    const parsedStart = startValue && datePattern.test(startValue) ? new Date(`${startValue}T03:00:00.000Z`) : null;
-    const parsedEnd = endValue && datePattern.test(endValue) ? new Date(`${endValue}T03:00:00.000Z`) : null;
+    const parsedStart = startValue ? new Date(`${startValue}T00:00:00.000Z`) : null;
+    const parsedEnd = endValue ? new Date(`${endValue}T00:00:00.000Z`) : null;
     if (parsedStart && parsedEnd && !Number.isNaN(parsedStart.getTime()) && !Number.isNaN(parsedEnd.getTime()) && parsedStart <= parsedEnd) {
       start = parsedStart;
       end = addDays(parsedEnd, 1);
@@ -139,7 +117,7 @@ export async function getAdminOverview(period: AdminPeriod) {
         (select coalesce(sum(times_seen), 0) from study_progress) ::int as reviews
     `,
     sql`
-      select timezone('America/Sao_Paulo', created_at)::date::text as date, count(*)::int as value
+      select date_trunc('day', created_at)::date::text as date, count(*)::int as value
       from profiles
       where created_at >= ${period.start}::timestamptz and created_at < ${period.end}::timestamptz
       group by 1 order by 1
@@ -172,7 +150,7 @@ export async function getAdminOverview(period: AdminPeriod) {
       select
         count(*)::int as cohort,
         count(*) filter (where exists (
-          select 1 from activity_events a where a.user_id = p.id and timezone('America/Sao_Paulo', a.created_at)::date = timezone('America/Sao_Paulo', p.created_at)::date + 7
+          select 1 from activity_events a where a.user_id = p.id and a.created_at::date = p.created_at::date + 7
         ))::int as retained_d7
       from profiles p
       where p.created_at >= ${period.start}::timestamptz and p.created_at < ${period.end}::timestamptz
@@ -249,11 +227,6 @@ function stringQuery(query: Record<string, string | string[] | undefined>, key: 
   return (Array.isArray(value) ? value[0] : value ?? fallback).trim();
 }
 
-function allowedStringQuery(query: Record<string, string | string[] | undefined>, key: string, allowed: ReadonlySet<string>, fallback: string) {
-  const value = stringQuery(query, key, fallback);
-  return allowed.has(value) ? value : fallback;
-}
-
 function intQuery(query: Record<string, string | string[] | undefined>, key: string, fallback: number, min: number, max: number) {
   const parsed = Number(stringQuery(query, key, String(fallback)));
   if (!Number.isInteger(parsed)) return fallback;
@@ -263,9 +236,9 @@ function intQuery(query: Record<string, string | string[] | undefined>, key: str
 export async function getAdminUsers(query: Record<string, string | string[] | undefined>) {
   await ensureSchema();
   const search = stringQuery(query, 'search').slice(0, 120);
-  const filter = allowedStringQuery(query, 'filter', new Set(['all', 'premium', 'free', 'active', 'inactive', 'inactive_7d', 'inactive_14d', 'inactive_30d', 'never_accessed', 'new', 'cancelled', 'rejected', 'high_engagement', 'low_engagement']), 'all');
-  const sort = allowedStringQuery(query, 'sort', new Set(['created', 'name', 'last_login']), 'created');
-  const direction = allowedStringQuery(query, 'direction', new Set(['asc', 'desc']), 'desc');
+  const filter = stringQuery(query, 'filter', 'all');
+  const sort = stringQuery(query, 'sort', 'created');
+  const direction = stringQuery(query, 'direction', 'desc');
   const page = intQuery(query, 'page', 1, 1, 100000);
   const pageSize = intQuery(query, 'pageSize', 25, 10, 100);
   const offset = (page - 1) * pageSize;
@@ -274,7 +247,6 @@ export async function getAdminUsers(query: Record<string, string | string[] | un
   const inactivityCutoff = new Date(Date.now() - inactivityDays * 24 * 60 * 60 * 1000).toISOString();
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
   const count = await sql`
     select count(*)::int as total
@@ -289,7 +261,6 @@ export async function getAdminUsers(query: Record<string, string | string[] | un
         or (${filter} = 'inactive' and (p.last_login_at is null or p.last_login_at < ${inactivityCutoff}::timestamptz))
         or (${filter} = 'inactive_7d' and (p.last_login_at is null or p.last_login_at < ${sevenDaysAgo}::timestamptz))
         or (${filter} = 'inactive_14d' and (p.last_login_at is null or p.last_login_at < ${fourteenDaysAgo}::timestamptz))
-        or (${filter} = 'inactive_30d' and (p.last_login_at is null or p.last_login_at < ${thirtyDaysAgo}::timestamptz))
         or (${filter} = 'never_accessed' and p.last_login_at is null)
         or (${filter} = 'new' and p.created_at >= now() - interval '7 days')
         or (${filter} = 'cancelled' and s.status = 'cancelled')
@@ -329,7 +300,6 @@ export async function getAdminUsers(query: Record<string, string | string[] | un
         or (${filter} = 'inactive' and (p.last_login_at is null or p.last_login_at < ${inactivityCutoff}::timestamptz))
         or (${filter} = 'inactive_7d' and (p.last_login_at is null or p.last_login_at < ${sevenDaysAgo}::timestamptz))
         or (${filter} = 'inactive_14d' and (p.last_login_at is null or p.last_login_at < ${fourteenDaysAgo}::timestamptz))
-        or (${filter} = 'inactive_30d' and (p.last_login_at is null or p.last_login_at < ${thirtyDaysAgo}::timestamptz))
         or (${filter} = 'never_accessed' and p.last_login_at is null)
         or (${filter} = 'new' and p.created_at >= now() - interval '7 days')
         or (${filter} = 'cancelled' and s.status = 'cancelled')
@@ -374,7 +344,7 @@ export async function getAdminUsers(query: Record<string, string | string[] | un
 
 export async function getAdminUser(userId: string) {
   await ensureSchema();
-  const [profile, activity] = await Promise.all([
+  const [profile, activity, payments] = await Promise.all([
     sql`
       select p.*, s.id as subscription_id, s.status as subscription_status, s.plan_name, s.amount,
         s.currency, s.mercado_pago_preapproval_id, s.started_at, s.next_payment_at, s.cancelled_at,
@@ -385,12 +355,13 @@ export async function getAdminUser(userId: string) {
         (select coalesce(avg(case when total_questions > 0 then correct_answers::numeric / total_questions * 100 end), 0) from quiz_results where user_id = p.id)::numeric as quiz_accuracy,
         (select coalesce(sum(times_seen), 0) from study_progress where user_id = p.id)::int as reviews_count,
         (select count(*) from activity_events where user_id = p.id and event_type = 'session_started')::int as sessions_count,
-        (select count(distinct timezone('America/Sao_Paulo', created_at)::date) from activity_events where user_id = p.id)::int as active_days,
+        (select count(distinct created_at::date) from activity_events where user_id = p.id)::int as active_days,
         (select coalesce(avg(case status when 'mastered' then 100 when 'almost' then 66.67 when 'learning' then 33.33 else 0 end), 0) from study_progress where user_id = p.id)::numeric as progress_percentage
       from profiles p left join subscriptions s on s.user_id = p.id
       where p.id = ${userId} limit 1
     `,
     sql`select event_type, resource_type, resource_id, metadata, created_at from activity_events where user_id = ${userId} order by created_at desc limit 100`,
+    sql`select id from subscriptions where user_id = ${userId} limit 1`,
   ]);
   const row = profile.rows[0];
   if (!row) return null;
@@ -414,7 +385,7 @@ export async function getAdminUser(userId: string) {
       activeDays: numberValue(row.active_days),
       progressPercentage: numberValue(row.progress_percentage),
     },
-    subscription: row.subscription_id ? {
+    subscription: payments.rows[0] ? {
       id: String(row.subscription_id),
       status: String(row.subscription_status),
       planName: String(row.plan_name),
@@ -441,7 +412,7 @@ export async function getAdminSubscriptions(query: Record<string, string | strin
   const page = intQuery(query, 'page', 1, 1, 100000);
   const pageSize = intQuery(query, 'pageSize', 25, 10, 100);
   const search = stringQuery(query, 'search').slice(0, 120);
-  const status = allowedStringQuery(query, 'status', new Set(['all', 'inactive', 'pending', 'active', 'paused', 'cancelled', 'rejected']), 'all');
+  const status = stringQuery(query, 'status', 'all');
   const offset = (page - 1) * pageSize;
   const count = await sql`
     select count(*)::int as total from subscriptions s join profiles p on p.id = s.user_id
@@ -475,9 +446,9 @@ export async function getAdminEngagement(period: AdminPeriod) {
     sql`select count(*)::int as total from activity_events where event_type = 'session_started' and created_at >= ${period.start}::timestamptz and created_at < ${period.end}::timestamptz`,
     sql`
       select
-        count(*) filter (where exists (select 1 from activity_events a where a.user_id = p.id and timezone('America/Sao_Paulo', a.created_at)::date = timezone('America/Sao_Paulo', p.created_at)::date + 1))::int as d1,
-        count(*) filter (where exists (select 1 from activity_events a where a.user_id = p.id and timezone('America/Sao_Paulo', a.created_at)::date = timezone('America/Sao_Paulo', p.created_at)::date + 7))::int as d7,
-        count(*) filter (where exists (select 1 from activity_events a where a.user_id = p.id and timezone('America/Sao_Paulo', a.created_at)::date = timezone('America/Sao_Paulo', p.created_at)::date + 30))::int as d30,
+        count(*) filter (where exists (select 1 from activity_events a where a.user_id = p.id and a.created_at::date = p.created_at::date + 1))::int as d1,
+        count(*) filter (where exists (select 1 from activity_events a where a.user_id = p.id and a.created_at::date = p.created_at::date + 7))::int as d7,
+        count(*) filter (where exists (select 1 from activity_events a where a.user_id = p.id and a.created_at::date = p.created_at::date + 30))::int as d30,
         count(*)::int as cohort
       from profiles p where p.created_at >= ${period.start}::timestamptz and p.created_at < ${period.end}::timestamptz
     `,
@@ -494,7 +465,7 @@ export async function getAdminEngagement(period: AdminPeriod) {
       order by p.last_login_at nulls first limit 10
     `,
     sql`
-      select timezone('America/Sao_Paulo', created_at)::date::text as date, count(distinct user_id)::int as value
+      select date_trunc('day', created_at)::date::text as date, count(distinct user_id)::int as value
       from activity_events
       where created_at >= ${period.start}::timestamptz and created_at < ${period.end}::timestamptz
       group by 1 order by 1
@@ -525,7 +496,7 @@ export async function getAdminResources(period: AdminPeriod) {
     sql`
       select
         (select count(*) from flashcards where created_at >= ${period.start}::timestamptz and created_at < ${period.end}::timestamptz)::int as flashcards,
-        (select count(*) from activity_events where event_type = 'flashcard_reviewed' and created_at >= ${period.start}::timestamptz and created_at < ${period.end}::timestamptz)::int as reviews,
+        (select coalesce(sum(times_seen), 0) from study_progress where last_reviewed_at >= ${period.start}::timestamptz and last_reviewed_at < ${period.end}::timestamptz)::int as reviews,
         (select count(*) from mental_maps where created_at >= ${period.start}::timestamptz and created_at < ${period.end}::timestamptz)::int as mental_maps,
         (select count(*) from quiz_results where created_at >= ${period.start}::timestamptz and created_at < ${period.end}::timestamptz)::int as quizzes,
         (select coalesce(avg(case when total_questions > 0 then correct_answers::numeric / total_questions * 100 end), 0) from quiz_results where created_at >= ${period.start}::timestamptz and created_at < ${period.end}::timestamptz)::numeric as quiz_accuracy
@@ -538,17 +509,16 @@ export async function getAdminResources(period: AdminPeriod) {
     `,
     sql`
       select date, sum(flashcards)::int as flashcards, sum(mental_maps)::int as mental_maps, sum(quizzes)::int as quizzes from (
-        select timezone('America/Sao_Paulo', created_at)::date::text as date, count(*) as flashcards, 0 as mental_maps, 0 as quizzes from flashcards where created_at >= ${period.start}::timestamptz and created_at < ${period.end}::timestamptz group by 1
+        select created_at::date::text as date, count(*) as flashcards, 0 as mental_maps, 0 as quizzes from flashcards where created_at >= ${period.start}::timestamptz and created_at < ${period.end}::timestamptz group by 1
         union all
-        select timezone('America/Sao_Paulo', created_at)::date::text, 0, count(*), 0 from mental_maps where created_at >= ${period.start}::timestamptz and created_at < ${period.end}::timestamptz group by 1
+        select created_at::date::text, 0, count(*), 0 from mental_maps where created_at >= ${period.start}::timestamptz and created_at < ${period.end}::timestamptz group by 1
         union all
-        select timezone('America/Sao_Paulo', created_at)::date::text, 0, 0, count(*) from quiz_results where created_at >= ${period.start}::timestamptz and created_at < ${period.end}::timestamptz group by 1
+        select created_at::date::text, 0, 0, count(*) from quiz_results where created_at >= ${period.start}::timestamptz and created_at < ${period.end}::timestamptz group by 1
       ) grouped group by date order by date
     `,
   ]);
   return {
     period,
-    notice: 'Revisões por período são contadas pelos eventos flashcard_reviewed e começam a acumular histórico após esta implantação.',
     flashcards: { created: numberValue(totals.rows[0]?.flashcards), reviewed: numberValue(totals.rows[0]?.reviews), uniqueUsers: numberValue(uniqueUsers.rows[0]?.flashcards) },
     mentalMaps: { created: numberValue(totals.rows[0]?.mental_maps), uniqueUsers: numberValue(uniqueUsers.rows[0]?.mental_maps) },
     quizzes: { completed: numberValue(totals.rows[0]?.quizzes), uniqueUsers: numberValue(uniqueUsers.rows[0]?.quizzes), averageAccuracy: numberValue(totals.rows[0]?.quiz_accuracy) },
@@ -588,7 +558,7 @@ export async function getAdminErrors(query: Record<string, string | string[] | u
   await ensureSchema();
   const page = intQuery(query, 'page', 1, 1, 100000);
   const pageSize = intQuery(query, 'pageSize', 25, 10, 100);
-  const status = allowedStringQuery(query, 'status', new Set(['all', 'new', 'investigating', 'resolved', 'ignored']), 'all');
+  const status = stringQuery(query, 'status', 'all');
   const offset = (page - 1) * pageSize;
   const count = await sql`select count(*)::int as total from application_errors where (${status} = 'all' or status = ${status})`;
   const result = await sql`
@@ -660,7 +630,7 @@ export async function buildAdminCsv(type: string, query: Record<string, string |
   if (type === 'growth') {
     const period = resolveAdminPeriod(query);
     const result = await sql`
-      select timezone('America/Sao_Paulo', created_at)::date::text as date, count(*)::int as new_users
+      select created_at::date::text as date, count(*)::int as new_users
       from profiles
       where created_at >= ${period.start}::timestamptz and created_at < ${period.end}::timestamptz
       group by 1 order by 1
@@ -671,7 +641,7 @@ export async function buildAdminCsv(type: string, query: Record<string, string |
   if (type === 'engagement') {
     const period = resolveAdminPeriod(query);
     const result = await sql`
-      select timezone('America/Sao_Paulo', created_at)::date::text as date, count(distinct user_id)::int as active_users,
+      select created_at::date::text as date, count(distinct user_id)::int as active_users,
         count(*) filter (where event_type = 'session_started')::int as sessions,
         count(*)::int as total_events
       from activity_events
@@ -686,9 +656,9 @@ export async function buildAdminCsv(type: string, query: Record<string, string |
     const result = await sql`
       select
         count(*)::int as cohort,
-        count(*) filter (where exists (select 1 from activity_events a where a.user_id = p.id and timezone('America/Sao_Paulo', a.created_at)::date = timezone('America/Sao_Paulo', p.created_at)::date + 1))::int as retained_d1,
-        count(*) filter (where exists (select 1 from activity_events a where a.user_id = p.id and timezone('America/Sao_Paulo', a.created_at)::date = timezone('America/Sao_Paulo', p.created_at)::date + 7))::int as retained_d7,
-        count(*) filter (where exists (select 1 from activity_events a where a.user_id = p.id and timezone('America/Sao_Paulo', a.created_at)::date = timezone('America/Sao_Paulo', p.created_at)::date + 30))::int as retained_d30
+        count(*) filter (where exists (select 1 from activity_events a where a.user_id = p.id and a.created_at::date = p.created_at::date + 1))::int as retained_d1,
+        count(*) filter (where exists (select 1 from activity_events a where a.user_id = p.id and a.created_at::date = p.created_at::date + 7))::int as retained_d7,
+        count(*) filter (where exists (select 1 from activity_events a where a.user_id = p.id and a.created_at::date = p.created_at::date + 30))::int as retained_d30
       from profiles p
       where p.created_at >= ${period.start}::timestamptz and p.created_at < ${period.end}::timestamptz
     `;
@@ -702,11 +672,11 @@ export async function buildAdminCsv(type: string, query: Record<string, string |
     const period = resolveAdminPeriod(query);
     const result = await sql`
       select date, sum(flashcards)::int as flashcards, sum(mental_maps)::int as mental_maps, sum(quizzes)::int as quizzes from (
-        select timezone('America/Sao_Paulo', created_at)::date::text as date, count(*) as flashcards, 0 as mental_maps, 0 as quizzes from flashcards where created_at >= ${period.start}::timestamptz and created_at < ${period.end}::timestamptz group by 1
+        select created_at::date::text as date, count(*) as flashcards, 0 as mental_maps, 0 as quizzes from flashcards where created_at >= ${period.start}::timestamptz and created_at < ${period.end}::timestamptz group by 1
         union all
-        select timezone('America/Sao_Paulo', created_at)::date::text, 0, count(*), 0 from mental_maps where created_at >= ${period.start}::timestamptz and created_at < ${period.end}::timestamptz group by 1
+        select created_at::date::text, 0, count(*), 0 from mental_maps where created_at >= ${period.start}::timestamptz and created_at < ${period.end}::timestamptz group by 1
         union all
-        select timezone('America/Sao_Paulo', created_at)::date::text, 0, 0, count(*) from quiz_results where created_at >= ${period.start}::timestamptz and created_at < ${period.end}::timestamptz group by 1
+        select created_at::date::text, 0, 0, count(*) from quiz_results where created_at >= ${period.start}::timestamptz and created_at < ${period.end}::timestamptz group by 1
       ) grouped group by date order by date
     `;
     const headers = ['date', 'flashcards_created', 'mental_maps_created', 'quizzes_completed'];
@@ -724,41 +694,40 @@ export async function buildAdminCsv(type: string, query: Record<string, string |
     const result = await sql`
       select s.id, s.user_id, p.email, s.plan_name, s.amount, s.currency, s.mercado_pago_preapproval_id, s.cancelled_at, s.updated_at
       from subscriptions s join profiles p on p.id = s.user_id
-      where s.status = 'cancelled' order by coalesce(s.cancelled_at, s.updated_at) desc limit 50000
+      where s.status = 'cancelled' order by coalesce(s.cancelled_at, s.updated_at) desc
     `;
     const headers = ['id', 'user_id', 'email', 'plan_name', 'amount', 'currency', 'external_id', 'cancelled_at', 'updated_at'];
     return [headers.map(csvCell).join(','), ...result.rows.map((row) => [row.id, row.user_id, row.email, row.plan_name, row.amount, row.currency, row.mercado_pago_preapproval_id, row.cancelled_at, row.updated_at].map(csvCell).join(','))].join('\n');
   }
   if (type === 'subscriptions') {
     const search = stringQuery(query, 'search').slice(0, 120);
-    const status = allowedStringQuery(query, 'status', new Set(['all', 'inactive', 'pending', 'active', 'paused', 'cancelled', 'rejected']), 'all');
+    const status = stringQuery(query, 'status', 'all');
     const result = await sql`
       select s.id, s.user_id, p.email, s.status, s.plan_name, s.amount, s.currency, s.mercado_pago_preapproval_id, s.started_at, s.next_payment_at, s.cancelled_at
       from subscriptions s join profiles p on p.id = s.user_id
       where (${search} = '' or p.full_name ilike ${`%${search}%`} or p.email ilike ${`%${search}%`} or s.id ilike ${`%${search}%`} or coalesce(s.mercado_pago_preapproval_id, '') ilike ${`%${search}%`})
         and (${status} = 'all' or s.status = ${status})
-      order by s.updated_at desc limit 50000
+      order by s.updated_at desc
     `;
     const headers = ['id', 'user_id', 'email', 'status', 'plan_name', 'amount', 'currency', 'external_id', 'started_at', 'next_payment_at', 'cancelled_at'];
     return [headers.map(csvCell).join(','), ...result.rows.map((row) => [row.id, row.user_id, row.email, row.status, row.plan_name, row.amount, row.currency, row.mercado_pago_preapproval_id, row.started_at, row.next_payment_at, row.cancelled_at].map(csvCell).join(','))].join('\n');
   }
   if (type === 'errors') {
-    const status = allowedStringQuery(query, 'status', new Set(['all', 'new', 'investigating', 'resolved', 'ignored']), 'all');
+    const status = stringQuery(query, 'status', 'all');
     const result = await sql`
       select id, category, message, page, user_id, status, occurrence_count, first_occurred_at, last_occurred_at
-      from application_errors where (${status} = 'all' or status = ${status}) order by last_occurred_at desc limit 50000
+      from application_errors where (${status} = 'all' or status = ${status}) order by last_occurred_at desc
     `;
     const headers = ['id', 'category', 'message', 'page', 'user_id', 'status', 'occurrences', 'first_occurred_at', 'last_occurred_at'];
     return [headers.map(csvCell).join(','), ...result.rows.map((row) => [row.id, row.category, row.message, row.page, row.user_id, row.status, row.occurrence_count, row.first_occurred_at, row.last_occurred_at].map(csvCell).join(','))].join('\n');
   }
   const search = stringQuery(query, 'search').slice(0, 120);
-  const filter = allowedStringQuery(query, 'filter', new Set(['all', 'premium', 'free', 'active', 'inactive', 'inactive_7d', 'inactive_14d', 'inactive_30d', 'never_accessed', 'new', 'cancelled', 'rejected', 'high_engagement', 'low_engagement']), 'all');
+  const filter = stringQuery(query, 'filter', 'all');
   const setting = await sql`select value from admin_settings where key = 'inactivity_days' limit 1`;
   const inactivityDays = Math.min(Math.max(numberValue(setting.rows[0]?.value) || 30, 1), 365);
   const inactivityCutoff = new Date(Date.now() - inactivityDays * 24 * 60 * 60 * 1000).toISOString();
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   const result = await sql`
     select p.id, p.full_name, p.email, p.account_status, p.created_at, p.last_login_at, coalesce(s.status, 'inactive') as subscription_status,
       (select count(*) from flashcards where user_id = p.id)::int as flashcards,
@@ -775,7 +744,6 @@ export async function buildAdminCsv(type: string, query: Record<string, string |
         or (${filter} = 'inactive' and (p.last_login_at is null or p.last_login_at < ${inactivityCutoff}::timestamptz))
         or (${filter} = 'inactive_7d' and (p.last_login_at is null or p.last_login_at < ${sevenDaysAgo}::timestamptz))
         or (${filter} = 'inactive_14d' and (p.last_login_at is null or p.last_login_at < ${fourteenDaysAgo}::timestamptz))
-        or (${filter} = 'inactive_30d' and (p.last_login_at is null or p.last_login_at < ${thirtyDaysAgo}::timestamptz))
         or (${filter} = 'never_accessed' and p.last_login_at is null)
         or (${filter} = 'new' and p.created_at >= now() - interval '7 days')
         or (${filter} = 'cancelled' and s.status = 'cancelled')
@@ -783,7 +751,7 @@ export async function buildAdminCsv(type: string, query: Record<string, string |
         or (${filter} = 'high_engagement' and (select count(*) from activity_events ae where ae.user_id = p.id and ae.created_at >= now() - interval '30 days') >= 10)
         or (${filter} = 'low_engagement' and (select count(*) from activity_events ae where ae.user_id = p.id and ae.created_at >= now() - interval '30 days') <= 2)
       )
-    order by p.created_at desc limit 50000
+    order by p.created_at desc
   `;
   const headers = ['id', 'name', 'email', 'account_status', 'created_at', 'last_login_at', 'subscription_status', 'progress_percentage', 'flashcards', 'mental_maps', 'quizzes'];
   return [headers.map(csvCell).join(','), ...result.rows.map((row) => [row.id, row.full_name, row.email, row.account_status, row.created_at, row.last_login_at, row.subscription_status, row.progress_percentage, row.flashcards, row.mental_maps, row.quizzes].map(csvCell).join(','))].join('\n');
