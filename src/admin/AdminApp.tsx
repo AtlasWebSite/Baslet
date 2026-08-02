@@ -342,7 +342,7 @@ function HomePage({ periodSelection, refreshKey, onPeriodChange }: { periodSelec
               {quickPeriods.map(([value, label]) => <button key={value} className={periodSelection.period === value ? 'is-active' : ''} onClick={() => onPeriodChange(value)}>{label}</button>)}
             </div>
           </header>
-          <div className="admin-home-panel__body"><BarChart points={overview.userGrowth} /></div>
+          <div className="admin-home-panel__body"><BarChart points={overview.userGrowth} period={periodSelection.period} /></div>
         </section>
 
         <section className="admin-home-panel admin-home-panel--distribution">
@@ -628,53 +628,221 @@ function MetricCard({ metric }: { metric: AdminMetric }) {
   return <article className={`admin-metric-card ${metric.status === 'unavailable' ? 'is-unavailable' : ''}`} title={metric.explanation}><span>{metric.label}</span><strong>{formatMetric(metric.value, metric.format)}</strong>{metric.changePercent !== null && <small className={positive ? 'is-positive' : 'is-negative'}>{positive ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{Math.abs(metric.changePercent).toFixed(1)}% vs. período anterior</small>}<p>{metric.explanation}</p></article>;
 }
 
-function BarChart({ points }: { points: AdminSeriesPoint[] }) {
-  const bars = useMemo(() => {
-    if (!points.length) return [];
-    const max = Math.max(...points.map((point) => point.value), 1);
-    return points.map((point) => ({ ...point, heightPercent: Math.max((point.value / max) * 100, point.value > 0 ? 4 : 0) }));
-  }, [points]);
-  if (!bars.length) return <AdminEmpty title="Sem registros no período" description="O gráfico será preenchido quando houver dados." />;
+function formatChartNumber(value: number) {
+  if (Math.abs(value) >= 1_000_000) return `${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(value / 1_000_000)}M`;
+  if (Math.abs(value) >= 1_000) return `${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(value / 1_000)}K`;
+  return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(value);
+}
+
+function parseChartDate(value: string) {
+  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T12:00:00Z` : value;
+  return new Date(normalized);
+}
+
+function chartDateKey(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function niceChartMaximum(value: number) {
+  if (value <= 1) return 4;
+  if (value <= 4) return 4;
+  const magnitude = 10 ** Math.floor(Math.log10(value));
+  const normalized = value / magnitude;
+  const nice = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+  return nice * magnitude;
+}
+
+interface PreparedChartPoint {
+  date: string;
+  label: string;
+  fullLabel: string;
+  value: number;
+}
+
+function prepareChartPoints(points: AdminSeriesPoint[], period?: string): PreparedChartPoint[] {
+  if (!period) {
+    return points.map((point) => ({
+      date: point.date,
+      label: new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'UTC' }).format(parseChartDate(point.date)),
+      fullLabel: new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium', timeZone: 'UTC' }).format(parseChartDate(point.date)),
+      value: point.value,
+    }));
+  }
+
+  const sourceByDay = new Map<string, number>();
+  for (const point of points) {
+    const date = parseChartDate(point.date);
+    if (Number.isNaN(date.getTime())) continue;
+    const key = chartDateKey(date);
+    sourceByDay.set(key, (sourceByDay.get(key) ?? 0) + point.value);
+  }
+
+  if (period === 'year') {
+    const now = new Date();
+    const result: PreparedChartPoint[] = [];
+    for (let offset = 11; offset >= 0; offset -= 1) {
+      const monthDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - offset, 1, 12));
+      const year = monthDate.getUTCFullYear();
+      const month = monthDate.getUTCMonth();
+      let value = 0;
+      for (const point of points) {
+        const pointDate = parseChartDate(point.date);
+        if (pointDate.getUTCFullYear() === year && pointDate.getUTCMonth() === month) value += point.value;
+      }
+      result.push({
+        date: chartDateKey(monthDate),
+        label: new Intl.DateTimeFormat('pt-BR', { month: 'short', timeZone: 'UTC' }).format(monthDate).replace('.', ''),
+        fullLabel: new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(monthDate),
+        value,
+      });
+    }
+    return result;
+  }
+
+  const dayCount = period === '7d' ? 7 : period === '30d' ? 30 : 1;
+  const end = new Date();
+  end.setUTCHours(12, 0, 0, 0);
+  const result: PreparedChartPoint[] = [];
+  for (let offset = dayCount - 1; offset >= 0; offset -= 1) {
+    const date = new Date(end);
+    date.setUTCDate(end.getUTCDate() - offset);
+    const key = chartDateKey(date);
+    result.push({
+      date: key,
+      label: dayCount > 1 ? String(dayCount - offset) : 'Hoje',
+      fullLabel: new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium', timeZone: 'UTC' }).format(date),
+      value: sourceByDay.get(key) ?? 0,
+    });
+  }
+  return result;
+}
+
+function BarChart({ points, period }: { points: AdminSeriesPoint[]; period?: string }) {
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const chartPoints = useMemo(() => prepareChartPoints(points, period), [points, period]);
+  const maxValue = Math.max(...chartPoints.map((point) => point.value), 0);
+  const axisMax = niceChartMaximum(maxValue);
+  const width = 1120;
+  const height = 330;
+  const margin = { top: 22, right: 14, bottom: 42, left: 62 };
+  const plotWidth = width - margin.left - margin.right;
+  const plotHeight = height - margin.top - margin.bottom;
+  const slotWidth = plotWidth / Math.max(chartPoints.length, 1);
+  const barWidth = Math.min(Math.max(slotWidth * 0.48, 8), 18);
+  const tickCount = 4;
+  const labelEvery = chartPoints.length > 31 ? Math.ceil(chartPoints.length / 12) : 1;
+
+  if (!chartPoints.length) return <AdminEmpty title="Sem registros no período" description="O gráfico será preenchido quando houver dados." />;
+
   return (
-    <div className="admin-chart admin-barchart">
-      <div className="admin-barchart__track" role="img" aria-label="Evolução no período">
-        {bars.map((bar) => (
-          <div key={bar.date} className="admin-barchart__col" title={`${bar.date}: ${bar.value}`}>
-            <div className="admin-barchart__bar" style={{ height: `${bar.heightPercent}%` }} />
-          </div>
-        ))}
-      </div>
-      <div className="admin-chart__axis"><span>{bars[0]?.date}</span><span>{bars.at(-1)?.date}</span></div>
+    <div className="admin-chart admin-barchart" onMouseLeave={() => setHoveredIndex(null)}>
+      <svg className="admin-barchart__svg" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Crescimento de usuários no período">
+        {Array.from({ length: tickCount + 1 }, (_, index) => {
+          const ratio = index / tickCount;
+          const y = margin.top + plotHeight * ratio;
+          const value = Math.round(axisMax * (1 - ratio));
+          return (
+            <g key={index}>
+              <line className="admin-barchart__grid-line" x1={margin.left} x2={width - margin.right} y1={y} y2={y} />
+              <text className="admin-barchart__y-label" x={margin.left - 16} y={y + 4} textAnchor="end">{formatChartNumber(value)}</text>
+            </g>
+          );
+        })}
+
+        {chartPoints.map((point, index) => {
+          const barHeight = point.value > 0 ? Math.max((point.value / axisMax) * plotHeight, 3) : 0;
+          const x = margin.left + slotWidth * index + (slotWidth - barWidth) / 2;
+          const y = margin.top + plotHeight - barHeight;
+          const active = hoveredIndex === index;
+          const showLabel = index % labelEvery === 0 || index === chartPoints.length - 1;
+          return (
+            <g key={`${point.date}-${index}`} className={`admin-barchart__datum ${active ? 'is-active' : ''}`} onMouseEnter={() => setHoveredIndex(index)}>
+              <rect className="admin-barchart__hit-area" x={margin.left + slotWidth * index} y={margin.top} width={slotWidth} height={plotHeight + 30} />
+              {point.value > 0 && <rect className="admin-barchart__bar" x={x} y={y} width={barWidth} height={barHeight} rx="4" ry="4" />}
+              {showLabel && <text className="admin-barchart__x-label" x={margin.left + slotWidth * index + slotWidth / 2} y={height - 13} textAnchor="middle">{point.label}</text>}
+              <title>{`${point.fullLabel}: ${new Intl.NumberFormat('pt-BR').format(point.value)}`}</title>
+            </g>
+          );
+        })}
+
+        {hoveredIndex !== null && (() => {
+          const point = chartPoints[hoveredIndex];
+          const centerX = margin.left + slotWidth * hoveredIndex + slotWidth / 2;
+          const barHeight = point.value > 0 ? Math.max((point.value / axisMax) * plotHeight, 3) : 0;
+          const topY = margin.top + plotHeight - barHeight;
+          const tooltipWidth = 134;
+          const tooltipHeight = 52;
+          const tooltipX = Math.min(Math.max(centerX - tooltipWidth / 2, margin.left), width - margin.right - tooltipWidth);
+          const tooltipY = Math.max(topY - tooltipHeight - 10, 4);
+          return (
+            <g className="admin-barchart__tooltip" pointerEvents="none">
+              <rect x={tooltipX} y={tooltipY} width={tooltipWidth} height={tooltipHeight} rx="8" />
+              <text x={tooltipX + 12} y={tooltipY + 20}>{point.fullLabel}</text>
+              <text className="admin-barchart__tooltip-value" x={tooltipX + 12} y={tooltipY + 39}>{new Intl.NumberFormat('pt-BR').format(point.value)} usuários</text>
+            </g>
+          );
+        })()}
+      </svg>
     </div>
   );
 }
 
-const donutPalette = ['#4f46e5', '#818cf8', '#c7d2fe', '#e0e7ff', '#a5b4fc'];
+const donutPalette = ['#3b5bfd', '#86a7ff', '#d7e0ff', '#6884ff', '#aebfff'];
 
 interface DonutSegment { label: string; value: number }
 function DonutChart({ segments, centerLabel }: { segments: DonutSegment[]; centerLabel: string }) {
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const total = segments.reduce((sum, segment) => sum + segment.value, 0);
   if (!total) return <AdminEmpty title="Sem dados para exibir" description="Este gráfico será preenchido quando houver registros." />;
-  let cumulative = 0;
-  const stops = segments.map((segment, index) => {
-    const start = (cumulative / total) * 100;
-    cumulative += segment.value;
-    const end = (cumulative / total) * 100;
-    return `${donutPalette[index % donutPalette.length]} ${start}% ${end}%`;
-  });
+
+  const size = 240;
+  const center = size / 2;
+  const radius = 88;
+  const circumference = 2 * Math.PI * radius;
+  let accumulated = 0;
+
   return (
     <div className="admin-donut">
-      <div className="admin-donut__ring" style={{ background: `conic-gradient(${stops.join(', ')})` }}>
-        <div className="admin-donut__center"><span>{centerLabel}</span><strong>{new Intl.NumberFormat('pt-BR').format(total)}</strong></div>
+      <div className="admin-donut__visual" onMouseLeave={() => setActiveIndex(null)}>
+        <svg className="admin-donut__svg" viewBox={`0 0 ${size} ${size}`} role="img" aria-label={`Distribuição de ${centerLabel}`}>
+          <circle className="admin-donut__track" cx={center} cy={center} r={radius} />
+          {segments.map((segment, index) => {
+            const ratio = segment.value / total;
+            const segmentLength = Math.max(circumference * ratio - (segment.value > 0 ? 3 : 0), 0);
+            const dashOffset = -accumulated;
+            accumulated += circumference * ratio;
+            return (
+              <circle
+                key={segment.label}
+                className={`admin-donut__segment ${activeIndex === index ? 'is-active' : ''}`}
+                cx={center}
+                cy={center}
+                r={radius}
+                stroke={donutPalette[index % donutPalette.length]}
+                strokeDasharray={`${segmentLength} ${circumference - segmentLength}`}
+                strokeDashoffset={dashOffset}
+                onMouseEnter={() => setActiveIndex(index)}
+              >
+                <title>{`${segment.label}: ${segment.value} (${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(ratio * 100)}%)`}</title>
+              </circle>
+            );
+          })}
+          <text className="admin-donut__center-label" x={center} y={center - 9} textAnchor="middle">{centerLabel}</text>
+          <text className="admin-donut__center-value" x={center} y={center + 22} textAnchor="middle">{new Intl.NumberFormat('pt-BR').format(total)}</text>
+        </svg>
       </div>
       <div className="admin-donut__legend">
-        {segments.map((segment, index) => (
-          <div key={segment.label} className="admin-donut__legend-item">
-            <i style={{ background: donutPalette[index % donutPalette.length] }} />
-            <span>{segment.label}</span>
-            <b>{new Intl.NumberFormat('pt-BR').format(segment.value)}</b>
-          </div>
-        ))}
+        {segments.map((segment, index) => {
+          const percentage = (segment.value / total) * 100;
+          return (
+            <button key={segment.label} type="button" className={`admin-donut__legend-item ${activeIndex === index ? 'is-active' : ''}`} onMouseEnter={() => setActiveIndex(index)} onFocus={() => setActiveIndex(index)}>
+              <i style={{ background: donutPalette[index % donutPalette.length] }} />
+              <span>{segment.label}</span>
+              <b>{new Intl.NumberFormat('pt-BR').format(segment.value)}</b>
+              <small>{new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(percentage)}%</small>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

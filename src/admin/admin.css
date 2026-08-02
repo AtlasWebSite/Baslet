@@ -388,63 +388,198 @@
 .admin-pagination button { min-height: 34px; background: var(--admin-surface); border-color: var(--admin-border-strong); }
 
 /* ==========================================================================
-   Chart
+   Charts
    ========================================================================== */
 
-.admin-chart { height: 260px; display: flex; flex-direction: column; color: var(--admin-ink); }
-.admin-chart__axis { display: flex; justify-content: space-between; padding-top: 9px; color: var(--admin-text-subtle); font-size: 10px; font-family: var(--admin-font-mono); }
-
-/* Bar chart — único ponto do painel com cor de destaque (índigo), o resto
-   do dashboard permanece monocromático. */
-.admin-barchart__track {
-  flex: 1;
-  display: flex;
-  align-items: flex-end;
-  gap: 3px;
-  padding-bottom: 1px;
-  border-left: 1px solid var(--admin-border);
-  border-bottom: 1px solid var(--admin-border);
-}
-.admin-barchart__col { flex: 1; min-width: 2px; height: 100%; display: flex; align-items: flex-end; }
-.admin-barchart__bar {
+.admin-chart {
   width: 100%;
-  min-height: 2px;
-  background: #4f46e5 !important;
-  border-radius: 3px 3px 0 0 !important;
-  transition: background-color .12s var(--admin-ease), opacity .12s var(--admin-ease);
+  min-width: 0;
+  color: var(--admin-ink);
 }
-.admin-barchart__col:hover .admin-barchart__bar { background: #3730a3 !important; }
 
-/* Donut chart — anel via conic-gradient puro em CSS, sem dependência externa. */
-.admin-donut { display: flex; align-items: center; gap: 24px; height: 260px; }
-.admin-donut__ring {
-  position: relative;
-  flex-shrink: 0;
-  width: 168px;
-  height: 168px;
-  border-radius: 50% !important;
+.admin-barchart {
+  min-height: 320px;
 }
-.admin-donut__center {
-  position: absolute;
-  inset: 22px;
+
+.admin-barchart__svg {
+  display: block;
+  width: 100%;
+  height: 320px;
+  overflow: visible;
+}
+
+.admin-barchart__grid-line {
+  stroke: var(--admin-border);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+.admin-barchart__y-label,
+.admin-barchart__x-label {
+  fill: var(--admin-text-subtle);
+  font-family: var(--admin-font-mono);
+  font-size: 11px;
+}
+
+.admin-barchart__hit-area {
+  fill: transparent;
+  cursor: pointer;
+}
+
+.admin-barchart__bar {
+  fill: #3b5bfd;
+  transition: opacity .14s var(--admin-ease), filter .14s var(--admin-ease), transform .14s var(--admin-ease);
+  transform-box: fill-box;
+  transform-origin: bottom;
+}
+
+.admin-barchart__datum:not(.is-active) .admin-barchart__bar {
+  opacity: .88;
+}
+
+.admin-barchart__datum.is-active .admin-barchart__bar {
+  opacity: 1;
+  filter: brightness(1.12);
+  transform: scaleY(1.015);
+}
+
+.admin-barchart__tooltip rect {
+  fill: #0f172a;
+  stroke: #334155;
+  stroke-width: 1;
+}
+
+.admin-barchart__tooltip text {
+  fill: #94a3b8;
+  font-family: var(--admin-font-ui);
+  font-size: 10px;
+}
+
+.admin-barchart__tooltip .admin-barchart__tooltip-value {
+  fill: #ffffff;
+  font-family: var(--admin-font-mono);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-donut {
+  min-height: 320px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+}
+
+.admin-donut__visual {
   display: grid;
   place-items: center;
-  gap: 2px;
-  background: var(--admin-surface);
-  border-radius: 50% !important;
-  text-align: center;
+  width: 100%;
 }
-.admin-donut__center span { color: var(--admin-text-muted); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
-.admin-donut__center strong { font-family: var(--admin-font-mono); font-size: 20px; font-weight: 700; letter-spacing: -.02em; }
-.admin-donut__legend { display: grid; gap: 10px; flex: 1; min-width: 0; }
-.admin-donut__legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--admin-text-muted); }
-.admin-donut__legend-item i { width: 9px; height: 9px; flex-shrink: 0; border-radius: 50% !important; }
-.admin-donut__legend-item span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.admin-donut__legend-item b { font-family: var(--admin-font-mono); color: var(--admin-ink); font-size: 12px; }
 
-@media (max-width: 480px) {
-  .admin-donut { flex-direction: column; align-items: flex-start; height: auto; gap: 16px; }
-  .admin-donut__ring { align-self: center; }
+.admin-donut__svg {
+  display: block;
+  width: min(240px, 100%);
+  height: auto;
+  overflow: visible;
+}
+
+.admin-donut__track,
+.admin-donut__segment {
+  fill: none;
+  stroke-width: 38;
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+}
+
+.admin-donut__track {
+  stroke: #e5e7eb;
+}
+
+.admin-donut__segment {
+  cursor: pointer;
+  transition: stroke-width .15s var(--admin-ease), filter .15s var(--admin-ease), opacity .15s var(--admin-ease);
+}
+
+.admin-donut__segment.is-active {
+  stroke-width: 43;
+  filter: brightness(1.08);
+}
+
+.admin-donut__center-label {
+  fill: var(--admin-text-muted);
+  font-family: var(--admin-font-ui);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.admin-donut__center-value {
+  fill: var(--admin-ink);
+  font-family: var(--admin-font-mono);
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.admin-donut__legend {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px 18px;
+}
+
+.admin-donut__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--admin-text-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: color .12s var(--admin-ease), opacity .12s var(--admin-ease);
+}
+
+.admin-donut__legend-item:hover,
+.admin-donut__legend-item.is-active {
+  color: var(--admin-ink);
+}
+
+.admin-donut__legend-item i {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  border-radius: 50% !important;
+}
+
+.admin-donut__legend-item b {
+  color: var(--admin-ink);
+  font-family: var(--admin-font-mono);
+  font-size: 12px;
+}
+
+.admin-donut__legend-item small {
+  color: var(--admin-text-subtle);
+  font-family: var(--admin-font-mono);
+  font-size: 10px;
+}
+
+@media (max-width: 650px) {
+  .admin-barchart,
+  .admin-barchart__svg {
+    min-height: 260px;
+    height: 260px;
+  }
+
+  .admin-donut {
+    min-height: 280px;
+  }
 }
 
 /* ==========================================================================
@@ -494,7 +629,7 @@
   .admin-secondary-button,
   .admin-icon-button,
   .admin-barchart__bar,
-  .admin-donut__ring {
+  .admin-donut__segment {
     animation: none !important;
     transition: none !important;
   }
@@ -589,43 +724,43 @@
 .admin-home {
   min-height: calc(100vh - 82px);
   margin: -26px;
-  padding: 26px;
-  background: #111827;
+  padding: 18px 18px 26px;
+  background: linear-gradient(180deg, #0e1728 0%, #111b2d 100%);
   color: #f8fafc;
 }
 
 .admin-home__metrics {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 20px;
+  gap: 18px;
 }
 
 .admin-home-metric {
   min-width: 0;
-  min-height: 174px;
+  min-height: 160px;
   display: flex;
   flex-direction: column;
-  padding: 20px;
-  background: #020617;
-  border: 1px solid #263244;
-  border-radius: 16px !important;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, .12);
+  padding: 18px 20px;
+  background: #030b1b;
+  border: 1px solid #22314b;
+  border-radius: 18px !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.03);
 }
 
 .admin-home-metric__icon {
-  width: 52px;
-  height: 52px;
+  width: 50px;
+  height: 50px;
   display: grid;
   place-items: center;
-  margin-bottom: 24px;
-  background: #111827;
-  border: 1px solid #1f2a3d;
-  border-radius: 12px !important;
-  color: #cbd5e1;
+  margin-bottom: 26px;
+  background: #0d1830;
+  border: 1px solid #21304b;
+  border-radius: 14px !important;
+  color: #d7e2f1;
 }
 
 .admin-home-metric > span {
-  color: #93c5fd;
+  color: #8ec5ff;
   font-size: 13px;
   font-weight: 500;
 }
@@ -640,9 +775,10 @@
 
 .admin-home-metric__value strong {
   overflow: hidden;
-  color: #f8fafc;
+  color: #ffffff;
   font-family: var(--admin-font-mono);
-  font-size: clamp(22px, 2.2vw, 29px);
+  font-size: clamp(22px, 2.2vw, 30px);
+  font-weight: 700;
   line-height: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -651,8 +787,8 @@
 .admin-home-metric__value small {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  padding: 4px 8px;
+  gap: 4px;
+  padding: 5px 10px;
   border-radius: 999px !important;
   font-family: var(--admin-font-mono);
   font-size: 10px;
@@ -660,91 +796,242 @@
   white-space: nowrap;
 }
 
-.admin-home-metric__value small.is-positive { background: rgba(22, 163, 74, .18); color: #4ade80; }
-.admin-home-metric__value small.is-negative { background: rgba(220, 38, 38, .18); color: #f87171; }
-.admin-home-metric__value small.is-neutral { background: #111827; color: #94a3b8; }
-.admin-home-metric > p { margin: 6px 0 0; color: #64748b; font-size: 10px; text-align: right; }
+.admin-home-metric__value small.is-positive { background: rgba(15, 118, 110, .25); color: #34d399; }
+.admin-home-metric__value small.is-negative { background: rgba(127, 29, 29, .28); color: #fb7185; }
+.admin-home-metric__value small.is-neutral { background: #0f1c32; color: #8da1bf; }
+.admin-home-metric > p { margin: 8px 0 0; color: #6d83a5; font-size: 11px; text-align: right; }
 .admin-home-metric.is-unavailable { opacity: .72; }
 
 .admin-home__dashboard-grid {
   display: grid;
-  grid-template-columns: minmax(0, 2.05fr) minmax(300px, .95fr);
-  gap: 24px;
-  margin-top: 24px;
+  grid-template-columns: minmax(0, 2.1fr) minmax(340px, .9fr);
+  gap: 22px;
+  margin-top: 22px;
 }
 
 .admin-home-panel {
   min-width: 0;
-  background: #020617;
-  border: 1px solid #263244;
-  border-radius: 16px !important;
+  background: #030b1b;
+  border: 1px solid #22314b;
+  border-radius: 18px !important;
   overflow: hidden;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, .12);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.03);
 }
 
 .admin-home-panel > header {
-  min-height: 78px;
+  min-height: 86px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 18px;
   padding: 18px 24px;
-  border-bottom: 1px solid #1e293b;
+  border-bottom: 1px solid #1b2940;
 }
 
-.admin-home-panel h2 { margin: 0; color: #f8fafc; font-size: 18px; letter-spacing: -.02em; }
-.admin-home-panel header p { margin: 7px 0 0; color: #93c5fd; font-size: 12px; }
-.admin-home-panel__body { padding: 26px 24px; }
+.admin-home-panel h2 { margin: 0; color: #ffffff; font-size: 16px; font-weight: 700; letter-spacing: -.02em; }
+.admin-home-panel header p { margin: 8px 0 0; color: #d3def0; font-size: 12px; }
+.admin-home-panel__body { padding: 22px 24px 24px; }
 
 .admin-home-periods {
   display: flex;
   align-items: center;
-  padding: 3px;
-  background: #0f172a;
-  border-radius: 9px !important;
+  gap: 6px;
+  padding: 5px;
+  background: #111e33;
+  border-radius: 12px !important;
 }
 
 .admin-home-periods button {
-  min-height: 38px;
+  min-height: 40px;
   padding: 0 14px;
   border: 0;
-  border-radius: 7px !important;
+  border-radius: 9px !important;
   background: transparent;
-  color: #93a4bd;
+  color: #98abc5;
   font: inherit;
   font-size: 12px;
   cursor: pointer;
 }
 
 .admin-home-periods button:hover { color: #fff; }
-.admin-home-periods button.is-active { background: #1e293b; color: #fff; }
+.admin-home-periods button.is-active { background: #24324a; color: #fff; }
 
-.admin-home .admin-chart { height: 300px; color: #e2e8f0; }
-.admin-home .admin-barchart__track { border-color: #1e293b; gap: 8px; }
-.admin-home .admin-barchart__bar { background: #3b5bfd !important; border-radius: 6px 6px 0 0 !important; }
-.admin-home .admin-barchart__col:hover .admin-barchart__bar { background: #6680ff !important; }
-.admin-home .admin-chart__axis { color: #64748b; }
-
-.admin-home .admin-donut {
-  height: 300px;
-  flex-direction: column;
-  justify-content: center;
-  gap: 26px;
+.admin-home .admin-chart {
+  min-height: 330px;
+  color: #e2e8f0;
 }
 
-.admin-home .admin-donut__ring { width: 220px; height: 220px; }
-.admin-home .admin-donut__center { inset: 38px; background: #020617; }
-.admin-home .admin-donut__center span { color: #cbd5e1; }
-.admin-home .admin-donut__center strong { color: #f8fafc; }
-.admin-home .admin-donut__legend { width: 100%; display: flex; justify-content: center; gap: 18px; }
-.admin-home .admin-donut__legend-item { color: #94a3b8; }
-.admin-home .admin-donut__legend-item b { color: #e2e8f0; }
+.admin-home .admin-barchart__svg {
+  display: block;
+  width: 100%;
+  height: 330px;
+  overflow: visible;
+}
 
-.admin-home .admin-state,
-.admin-home .admin-skeleton div {
-  background-color: #020617;
-  border-color: #263244;
-  color: #f8fafc;
+.admin-home .admin-barchart__grid-line {
+  stroke: #172238;
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+.admin-home .admin-barchart__y-label,
+.admin-home .admin-barchart__x-label {
+  fill: #7890b2;
+  font-family: var(--admin-font-ui);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.admin-home .admin-barchart__x-label {
+  font-size: 10px;
+}
+
+.admin-home .admin-barchart__bar {
+  fill: #3f5bf6;
+  opacity: 1;
+  filter: none;
+  transition: fill .14s ease, opacity .14s ease;
+}
+
+.admin-home .admin-barchart__datum:not(.is-active) .admin-barchart__bar {
+  opacity: 1;
+}
+
+.admin-home .admin-barchart__datum.is-active .admin-barchart__bar,
+.admin-home .admin-barchart__datum:hover .admin-barchart__bar {
+  fill: #5b73ff;
+  opacity: 1;
+  transform: none;
+  filter: none;
+}
+
+.admin-home .admin-barchart__hit-area {
+  fill: transparent;
+}
+
+.admin-home .admin-barchart__tooltip rect {
+  fill: #0d1729;
+  stroke: #2a3954;
+  stroke-width: 1;
+}
+
+.admin-home .admin-barchart__tooltip text {
+  fill: #9fb0c9;
+  font-family: var(--admin-font-ui);
+  font-size: 11px;
+}
+
+.admin-home .admin-barchart__tooltip-value {
+  fill: #ffffff !important;
+  font-family: var(--admin-font-mono);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-home .admin-donut {
+  min-height: 330px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+
+.admin-home .admin-donut__visual {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.admin-home .admin-donut__svg {
+  display: block;
+  width: 240px;
+  height: 240px;
+  overflow: visible;
+}
+
+.admin-home .admin-donut__track {
+  fill: none;
+  stroke: #121d31;
+  stroke-width: 38;
+}
+
+.admin-home .admin-donut__segment {
+  fill: none;
+  stroke-width: 38;
+  stroke-linecap: butt;
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+  transition: opacity .15s ease, filter .15s ease;
+}
+
+.admin-home .admin-donut__segment.is-active,
+.admin-home .admin-donut__segment:hover {
+  stroke-width: 38;
+  opacity: 1;
+  filter: brightness(1.08);
+}
+
+.admin-home .admin-donut__center-label {
+  fill: #ffffff;
+  font-family: var(--admin-font-ui);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.admin-home .admin-donut__center-value {
+  fill: #a9b9d3;
+  font-family: var(--admin-font-ui);
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.admin-home .admin-donut__legend {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 18px;
+}
+
+.admin-home .admin-donut__legend-item {
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #a6b6ce;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.admin-home .admin-donut__legend-item i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50% !important;
+}
+
+.admin-home .admin-donut__legend-item span {
+  color: #a6b6ce;
+  font-size: 12px;
+}
+
+.admin-home .admin-donut__legend-item b {
+  color: #ffffff;
+  font-family: var(--admin-font-ui);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.admin-home .admin-donut__legend-item small {
+  display: none;
 }
 
 @media (max-width: 1180px) {
@@ -760,6 +1047,7 @@
   .admin-home-panel__body { padding: 18px 16px; }
   .admin-home-periods { width: 100%; overflow-x: auto; }
   .admin-home-periods button { flex: 1 0 auto; }
-  .admin-home .admin-chart { height: 240px; }
-  .admin-home .admin-donut__ring { width: 180px; height: 180px; }
+  .admin-home .admin-chart { min-height: 260px; }
+  .admin-home .admin-barchart__svg { height: 260px; }
+  .admin-home .admin-donut__svg { width: 200px; }
 }
