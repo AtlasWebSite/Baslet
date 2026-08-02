@@ -73,7 +73,8 @@ const periodOptions = [
 ] as const;
 
 const navigation = [
-  { path: '/admin', label: 'Visão geral', icon: LayoutDashboard },
+  { path: '/admin', label: 'Início', icon: LayoutDashboard },
+  { path: '/admin/visao-geral', label: 'Visão geral', icon: BarChart3 },
   { path: '/admin/usuarios', label: 'Usuários', icon: Users },
   { path: '/admin/assinaturas', label: 'Assinaturas', icon: WalletCards },
   { path: '/admin/pagamentos', label: 'Pagamentos', icon: CreditCard },
@@ -86,7 +87,8 @@ const navigation = [
 ];
 
 const pageTitles: Record<string, string> = {
-  '/admin': 'Visão geral',
+  '/admin': 'Início',
+  '/admin/visao-geral': 'Visão geral',
   '/admin/usuarios': 'Usuários',
   '/admin/assinaturas': 'Assinaturas',
   '/admin/pagamentos': 'Pagamentos',
@@ -176,12 +178,37 @@ export function AdminApp({ authenticated, authError, authLoading }: AdminAppProp
       .finally(() => setIsChecking(false));
   }, [authenticated, authLoading]);
 
+  const periodSelection: AdminPeriodSelection = period === 'custom' ? { period, start: customStart, end: customEnd } : { period };
+
+
+  useEffect(() => {
+    if (!admin) return;
+
+    // Pré-carrega as seções mais acessadas depois que a tela inicial já começou
+    // a renderizar. O cache também elimina requisições duplicadas ao trocar de aba.
+    const timer = window.setTimeout(() => {
+      const periodDependencies = [periodSelection.period, periodSelection.start, periodSelection.end, refreshKey];
+      const prefetch = <T,>(key: string, loader: () => Promise<T>) => {
+        void fetchWithAdminCache(key, loader).catch(() => undefined);
+      };
+
+      prefetch(adminCacheKey('overview', periodDependencies), () => getAdminOverview(periodSelection));
+      prefetch(adminCacheKey('engagement', periodDependencies), () => getAdminSection<EngagementResponse>('engagement', periodSelection));
+      prefetch(adminCacheKey('resources', periodDependencies), () => getAdminSection<ResourcesResponse>('resources', periodSelection));
+      prefetch(adminCacheKey('finance', [refreshKey]), () => getAdminSection<FinanceResponse>('finance'));
+      prefetch(adminCacheKey('payments', [refreshKey]), () => getAdminSection<PaymentsResponse>('payments'));
+      prefetch(adminCacheKey('reports', [refreshKey]), () => getAdminSection<ReportsResponse>('reports'));
+      prefetch(adminCacheKey('settings', [refreshKey]), () => getAdminSection<SettingsResponse>('settings'));
+    }, 900);
+
+    return () => window.clearTimeout(timer);
+  }, [admin, periodSelection.period, periodSelection.start, periodSelection.end, refreshKey]);
+
   if (authLoading || isChecking) return <AdminLoading label="Validando acesso administrativo..." />;
   if (authError) return <AdminError message={authError} onRetry={() => window.location.reload()} />;
   if (!authenticated) return <AdminLoginRedirect />;
   if (accessError || !admin) return <AdminError message={accessError || 'Não foi possível validar o proprietário.'} onRetry={() => window.location.reload()} />;
 
-  const periodSelection: AdminPeriodSelection = period === 'custom' ? { period, start: customStart, end: customEnd } : { period };
   const basePath = pathname.startsWith('/admin/usuarios/') ? '/admin/usuarios' : pathname;
   const title = pathname.startsWith('/admin/usuarios/') ? 'Perfil do usuário' : pageTitles[basePath] ?? 'Painel administrativo';
 
@@ -208,7 +235,7 @@ export function AdminApp({ authenticated, authError, authLoading }: AdminAppProp
           </div>
         </header>
         <main className="admin-content">
-          <AdminRoute pathname={pathname} periodSelection={periodSelection} refreshKey={refreshKey} />
+          <AdminRoute pathname={pathname} periodSelection={periodSelection} refreshKey={refreshKey} onPeriodChange={setPeriod} />
         </main>
       </div>
     </div>
@@ -237,10 +264,11 @@ function AdminSidebar({ pathname, mobileOpen, onClose }: { pathname: string; mob
   );
 }
 
-function AdminRoute({ pathname, periodSelection, refreshKey }: { pathname: string; periodSelection: AdminPeriodSelection; refreshKey: number }) {
+function AdminRoute({ pathname, periodSelection, refreshKey, onPeriodChange }: { pathname: string; periodSelection: AdminPeriodSelection; refreshKey: number; onPeriodChange: (period: string) => void }) {
   const userMatch = pathname.match(/^\/admin\/usuarios\/([^/]+)$/);
   if (userMatch) return <UserDetailPage userId={decodeURIComponent(userMatch[1])} refreshKey={refreshKey} />;
-  if (pathname === '/admin') return <OverviewPage periodSelection={periodSelection} refreshKey={refreshKey} />;
+  if (pathname === '/admin') return <HomePage periodSelection={periodSelection} refreshKey={refreshKey} onPeriodChange={onPeriodChange} />;
+  if (pathname === '/admin/visao-geral') return <OverviewPage periodSelection={periodSelection} refreshKey={refreshKey} />;
   if (pathname === '/admin/usuarios') return <UsersPage refreshKey={refreshKey} />;
   if (pathname === '/admin/assinaturas') return <SubscriptionsPage refreshKey={refreshKey} />;
   if (pathname === '/admin/pagamentos') return <PaymentsPage refreshKey={refreshKey} />;
@@ -251,6 +279,79 @@ function AdminRoute({ pathname, periodSelection, refreshKey }: { pathname: strin
   if (pathname === '/admin/relatorios') return <ReportsPage periodSelection={periodSelection} refreshKey={refreshKey} />;
   if (pathname === '/admin/configuracoes') return <SettingsPage refreshKey={refreshKey} />;
   return <AdminEmpty title="Página não encontrada" description="Esta rota administrativa não existe." />;
+}
+
+function findOverviewMetric(overview: AdminOverview, id: string) {
+  return overview.metrics.find((metric) => metric.id === id) ?? null;
+}
+
+function HomeMetricCard({ metric, icon }: { metric: AdminMetric | null; icon: ReactNode }) {
+  if (!metric) {
+    return <article className="admin-home-metric is-unavailable"><div className="admin-home-metric__icon">{icon}</div><span>Dados indisponíveis</span><strong>—</strong><small>Esta métrica ainda não está disponível.</small></article>;
+  }
+
+  const positive = (metric.changePercent ?? 0) >= 0;
+  return (
+    <article className={`admin-home-metric ${metric.status === 'unavailable' ? 'is-unavailable' : ''}`} title={metric.explanation}>
+      <div className="admin-home-metric__icon">{icon}</div>
+      <span>{metric.label}</span>
+      <div className="admin-home-metric__value">
+        <strong>{formatMetric(metric.value, metric.format)}</strong>
+        {metric.changePercent !== null ? (
+          <small className={positive ? 'is-positive' : 'is-negative'}>{positive ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}{positive ? '+' : '-'}{Math.abs(metric.changePercent).toFixed(1)}%</small>
+        ) : <small className="is-neutral">Sem comparação</small>}
+      </div>
+      <p>Em relação ao período anterior</p>
+    </article>
+  );
+}
+
+function HomePage({ periodSelection, refreshKey, onPeriodChange }: { periodSelection: AdminPeriodSelection; refreshKey: number; onPeriodChange: (period: string) => void }) {
+  const state = useAsyncData('overview', () => getAdminOverview(periodSelection), [periodSelection.period, periodSelection.start, periodSelection.end, refreshKey]);
+  if (state.loading) return <div className="admin-home"><AdminSkeleton rows={7} /></div>;
+  if (state.error || !state.data) return <div className="admin-home"><AdminError message={state.error || 'Dados indisponíveis.'} onRetry={state.retry} /></div>;
+
+  const overview = state.data;
+  const premiumUsers = findOverviewMetric(overview, 'premium-users')?.value ?? 0;
+  const freeUsers = findOverviewMetric(overview, 'free-users')?.value ?? 0;
+  const quickPeriods = [
+    ['year', '12 meses'],
+    ['30d', '30 dias'],
+    ['7d', '7 dias'],
+    ['today', '24 horas'],
+  ] as const;
+
+  const cards = [
+    { metric: findOverviewMetric(overview, 'mrr'), icon: <CircleDollarSign size={20} /> },
+    { metric: findOverviewMetric(overview, 'active-users'), icon: <Users size={20} /> },
+    { metric: findOverviewMetric(overview, 'conversion'), icon: <BarChart3 size={20} /> },
+    { metric: findOverviewMetric(overview, 'average-sessions'), icon: <Activity size={20} /> },
+  ];
+
+  return (
+    <div className="admin-home">
+      <div className="admin-home__metrics">
+        {cards.map((item, index) => <HomeMetricCard key={item.metric?.id ?? index} metric={item.metric} icon={item.icon} />)}
+      </div>
+
+      <div className="admin-home__dashboard-grid">
+        <section className="admin-home-panel admin-home-panel--analytics">
+          <header>
+            <div><h2>Analytics</h2><p>Crescimento real de usuários no período selecionado</p></div>
+            <div className="admin-home-periods">
+              {quickPeriods.map(([value, label]) => <button key={value} className={periodSelection.period === value ? 'is-active' : ''} onClick={() => onPeriodChange(value)}>{label}</button>)}
+            </div>
+          </header>
+          <div className="admin-home-panel__body"><BarChart points={overview.userGrowth} /></div>
+        </section>
+
+        <section className="admin-home-panel admin-home-panel--distribution">
+          <header><div><h2>Usuários por plano</h2><p>Distribuição atual entre gratuito e Premium</p></div></header>
+          <div className="admin-home-panel__body"><DonutChart segments={[{ label: 'Premium', value: Number(premiumUsers) }, { label: 'Gratuitos', value: Number(freeUsers) }]} centerLabel="Usuários" /></div>
+        </section>
+      </div>
+    </div>
+  );
 }
 
 function OverviewPage({ periodSelection, refreshKey }: { periodSelection: AdminPeriodSelection; refreshKey: number }) {
