@@ -288,6 +288,39 @@ async function handleProfile(request: VercelRequest, response: VercelResponse) {
   }
 }
 
+async function handleAppBootstrap(request: VercelRequest, response: VercelResponse) {
+  if (getMethod(request) !== 'GET') {
+    methodNotAllowed(response);
+    return;
+  }
+
+  const user = await getSessionUser(request);
+  if (!user) {
+    json(response, 200, { session: null, bootstrap: null });
+    return;
+  }
+
+  try {
+    const [profile, studySets, subscription] = await Promise.all([
+      getProfile(user),
+      getStudySets(user),
+      getSubscription(user),
+    ]);
+    json(response, 200, {
+      session: {
+        user: {
+          id: user.id,
+          email: user.email,
+          user_metadata: { full_name: user.fullName, name: user.fullName, avatar_url: user.avatarUrl },
+        },
+      },
+      bootstrap: { userId: user.id, profile, studySets, subscription },
+    });
+  } catch {
+    json(response, 500, { error: 'Não foi possível carregar sua conta.' });
+  }
+}
+
 async function handleProfileOnboarding(request: VercelRequest, response: VercelResponse) {
   if (getMethod(request) !== 'POST') {
     methodNotAllowed(response);
@@ -646,6 +679,7 @@ export async function handlePublicRequest(
   if (resource === 'auth' && action === 'session') return handleAuthSession(request, response);
 
   if (resource === 'account' && !action) return handleAccount(request, response);
+  if (resource === 'account' && action === 'bootstrap') return handleAppBootstrap(request, response);
 
   if (resource === 'profile' && !action) return handleProfile(request, response);
   if (resource === 'profile' && action === 'onboarding') return handleProfileOnboarding(request, response);

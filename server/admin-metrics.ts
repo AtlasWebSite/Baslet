@@ -1,7 +1,7 @@
 import { sql } from '@vercel/postgres';
 import { ensureSchema } from './db.js';
 
-export type AdminPeriodKey = 'today' | 'yesterday' | '7d' | '30d' | '90d' | 'month' | 'previous_month' | 'year' | 'custom';
+export type AdminPeriodKey = 'today' | 'yesterday' | '7d' | '30d' | '90d' | '12m' | 'month' | 'previous_month' | 'year' | 'custom';
 
 export interface AdminPeriod {
   key: AdminPeriodKey;
@@ -46,6 +46,7 @@ export function resolveAdminPeriod(query: Record<string, string | string[] | und
   }
   if (key === '7d') start = addDays(today, -6);
   if (key === '90d') start = addDays(today, -89);
+  if (key === '12m') start = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - 11, 1));
   if (key === 'month') start = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
   if (key === 'previous_month') {
     end = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
@@ -94,6 +95,38 @@ function metric(id: string, label: string, value: number | null, previous: numbe
 
 export async function getAdminOverview(period: AdminPeriod) {
   await ensureSchema();
+  const durationDays = (new Date(period.end).getTime() - new Date(period.start).getTime()) / 86_400_000;
+  const seriesPromise = period.key === 'today' || period.key === 'yesterday'
+    ? sql`
+        with buckets as (
+          select generate_series(${period.start}::timestamptz, ${period.end}::timestamptz - interval '1 hour', interval '1 hour') as bucket_start
+        )
+        select to_char(bucket_start at time zone 'UTC', 'YYYY-MM-DD"T"HH24:00:00"Z"') as date, count(p.id)::int as value
+        from buckets
+        left join profiles p on p.created_at >= bucket_start and p.created_at < bucket_start + interval '1 hour'
+        group by bucket_start order by bucket_start
+      `
+    : period.key === '12m' || period.key === 'year' || durationDays > 93
+      ? sql`
+          with buckets as (
+            select generate_series(date_trunc('month', ${period.start}::timestamptz), ${period.end}::timestamptz - interval '1 day', interval '1 month') as bucket_start
+          )
+          select to_char(bucket_start at time zone 'UTC', 'YYYY-MM-01') as date, count(p.id)::int as value
+          from buckets
+          left join profiles p
+            on p.created_at >= greatest(bucket_start, ${period.start}::timestamptz)
+           and p.created_at < least(bucket_start + interval '1 month', ${period.end}::timestamptz)
+          group by bucket_start order by bucket_start
+        `
+      : sql`
+          with buckets as (
+            select generate_series(${period.start}::timestamptz, ${period.end}::timestamptz - interval '1 day', interval '1 day') as bucket_start
+          )
+          select to_char(bucket_start at time zone 'UTC', 'YYYY-MM-DD') as date, count(p.id)::int as value
+          from buckets
+          left join profiles p on p.created_at >= bucket_start and p.created_at < bucket_start + interval '1 day'
+          group by bucket_start order by bucket_start
+        `;
   const [users, newUsers, previousNewUsers, activeUsers, previousActiveUsers, subscriptions, resources, series, fixedMetrics, activitySummary, retentionSummary] = await Promise.all([
     sql`select count(*)::int as total from profiles`,
     sql`select count(*)::int as total from profiles where created_at >= ${period.start}::timestamptz and created_at < ${period.end}::timestamptz`,
@@ -116,12 +149,7 @@ export async function getAdminOverview(period: AdminPeriod) {
         (select count(*) from quiz_results) ::int as quizzes,
         (select coalesce(sum(times_seen), 0) from study_progress) ::int as reviews
     `,
-    sql`
-      select date_trunc('day', created_at)::date::text as date, count(*)::int as value
-      from profiles
-      where created_at >= ${period.start}::timestamptz and created_at < ${period.end}::timestamptz
-      group by 1 order by 1
-    `,
+    seriesPromise,
     sql`
       with bounds as (
         select (timezone('America/Sao_Paulo', now())::date at time zone 'America/Sao_Paulo') as day_start

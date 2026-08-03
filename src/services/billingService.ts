@@ -1,7 +1,10 @@
 import { apiGet, apiPost } from '../lib/apiClient';
 import type { CheckoutResponse, Subscription, SubscriptionStatus } from '../types/subscription';
+import { consumeBootstrapSubscription } from './authService';
 
-export async function getUserSubscription(_userId: string) {
+export async function getUserSubscription(userId: string) {
+  const cached = consumeBootstrapSubscription(userId);
+  if (cached.found) return cached.value;
   const { subscription } = await apiGet<{ subscription: Subscription | null }>('/api/payments?route=subscription');
   return subscription;
 }

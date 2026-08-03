@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { Sidebar } from './components/layout/Sidebar';
 import { BottomNavigation } from './components/layout/BottomNavigation';
@@ -26,17 +26,23 @@ import type { StudySet, ToastMessage, ViewId } from './types';
 import type { PaymentReturnStatus } from './types/subscription';
 import { newId } from './utils/study';
 import { HomeView } from './views/HomeView';
-import { StudiesView } from './views/StudiesView';
-import { FlashcardsView } from './views/FlashcardsView';
-import { QuizView } from './views/QuizView';
-import { ProgressView } from './views/ProgressView';
-import { ProfileView } from './views/ProfileView';
-import { MindMapsView } from './views/MindMapsView';
 import { AdminApp } from './admin/AdminApp';
 
 const LEGACY_KEY = 'studyflow_sets_v1';
 const INITIAL_VIEW: ViewId = 'home';
 const nonStudyActionViews = new Set<ViewId>(['billing', 'profile']);
+const loadStudiesView = () => import('./views/StudiesView');
+const loadFlashcardsView = () => import('./views/FlashcardsView');
+const loadQuizView = () => import('./views/QuizView');
+const loadProgressView = () => import('./views/ProgressView');
+const loadProfileView = () => import('./views/ProfileView');
+const loadMindMapsView = () => import('./views/MindMapsView');
+const StudiesView = lazy(() => loadStudiesView().then((module) => ({ default: module.StudiesView })));
+const FlashcardsView = lazy(() => loadFlashcardsView().then((module) => ({ default: module.FlashcardsView })));
+const QuizView = lazy(() => loadQuizView().then((module) => ({ default: module.QuizView })));
+const ProgressView = lazy(() => loadProgressView().then((module) => ({ default: module.ProgressView })));
+const ProfileView = lazy(() => loadProfileView().then((module) => ({ default: module.ProfileView })));
+const MindMapsView = lazy(() => loadMindMapsView().then((module) => ({ default: module.MindMapsView })));
 
 function getPaymentReturnStatus(pathname: string): PaymentReturnStatus | undefined {
   if (pathname === '/billing/success') return 'success';
@@ -51,10 +57,54 @@ function isPaymentRedirectPath(pathname: string) {
 
 export function App() {
   const auth = useAuth();
-  if (window.location.pathname === '/auth/callback') return <AuthCallbackPage />;
-  if (window.location.pathname.startsWith('/admin')) return <AdminApp authenticated={Boolean(auth.user)} authLoading={auth.isLoading} authError={auth.error} />;
-  if (isPaymentRedirectPath(window.location.pathname)) return <PaymentEntryPage auth={auth} />;
+  const [pathname, setPathname] = useState(() => window.location.pathname);
+
+  useEffect(() => {
+    const updatePathname = () => setPathname(window.location.pathname);
+    window.addEventListener('popstate', updatePathname);
+    return () => window.removeEventListener('popstate', updatePathname);
+  }, []);
+
+  const isAdminPath = pathname === '/admin' || pathname === '/admin/' || pathname.startsWith('/admin/');
+  if (pathname === '/auth/callback') return <AuthCallbackPage />;
+  if (isAdminPath) return <StealthAdminEntry auth={auth} />;
+  if (isPaymentRedirectPath(pathname)) return <PaymentEntryPage auth={auth} />;
   return <AuthGuard session={auth.session} isLoading={auth.isLoading} error={auth.error}>{auth.user && <AuthenticatedApp user={auth.user}/>}</AuthGuard>;
+}
+
+function StealthAdminEntry({ auth }: { auth: ReturnType<typeof useAuth> }) {
+  const [revealCancelled, setRevealCancelled] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+  const [regularAppReady, setRegularAppReady] = useState(false);
+
+  useEffect(() => {
+    if (!auth.isLoading && (!auth.user || auth.error)) setRegularAppReady(true);
+  }, [auth.error, auth.isLoading, auth.user]);
+
+  useEffect(() => {
+    if (revealed) return;
+    const handleVisibility = () => { if (document.hidden) setRevealCancelled(true); };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [revealed]);
+
+  const regularApp = (
+    <AuthGuard session={auth.session} isLoading={auth.isLoading} error={auth.error}>
+      {auth.user && <AuthenticatedApp user={auth.user} preservePath onReady={() => setRegularAppReady(true)} onNavigateAway={() => setRevealCancelled(true)} />}
+    </AuthGuard>
+  );
+
+  return (
+    <AdminApp
+      authenticated={Boolean(auth.user)}
+      authLoading={auth.isLoading}
+      authError={auth.error}
+      verificationEnabled={regularAppReady}
+      stealthFallback={regularApp}
+      revealCancelled={revealCancelled}
+      onReveal={() => setRevealed(true)}
+    />
+  );
 }
 
 function PaymentEntryPage({ auth }: { auth: ReturnType<typeof useAuth> }) {
@@ -83,7 +133,7 @@ function AuthenticatedPaymentEntryPage({ user }: { user: NonNullable<ReturnType<
   );
 }
 
-function AuthenticatedApp({ user }: { user: NonNullable<ReturnType<typeof useAuth>['user']> }) {
+function AuthenticatedApp({ user, preservePath = false, onReady, onNavigateAway }: { user: NonNullable<ReturnType<typeof useAuth>['user']>; preservePath?: boolean; onReady?: () => void; onNavigateAway?: () => void }) {
   const billing = useSubscription(user.id);
   const { profile, isLoading: profileLoading, error: profileError, finishOnboarding, finishWalkthrough } = useProfile(user);
   const { studySets, isLoading: setsLoading, error: setsError, starterSetsCreated, starterWarning, addStudySet, updateStudySet, clearStudySets, clearSensitiveState } = useStudySets(user.id, true);
@@ -100,11 +150,11 @@ function AuthenticatedApp({ user }: { user: NonNullable<ReturnType<typeof useAut
     setActiveView(INITIAL_VIEW);
     setActiveCardId(undefined);
 
-    if (getPaymentReturnStatus(window.location.pathname)) return;
+    if (preservePath || getPaymentReturnStatus(window.location.pathname)) return;
     if (window.location.pathname === '/') return;
 
     window.history.replaceState({}, document.title, '/');
-  }, [user.id]);
+  }, [preservePath, user.id]);
   useEffect(() => { if (!starterSetsCreated) return; setToast({ id: newId('toast'), type: 'success', message: 'Criamos alguns flashcards iniciais para você começar.' }); }, [starterSetsCreated]);
   useEffect(() => { try { const raw = localStorage.getItem(LEGACY_KEY); if (!raw) return; const parsed: unknown = JSON.parse(raw); if (Array.isArray(parsed) && parsed.length) setLegacySets(parsed as StudySet[]); } catch { localStorage.removeItem(LEGACY_KEY); } }, []);
   useEffect(() => { if (billing.isPremium) setPremiumOpen(false); }, [billing.isPremium]);
@@ -113,6 +163,17 @@ function AuthenticatedApp({ user }: { user: NonNullable<ReturnType<typeof useAut
     window.addEventListener('studyflow:open-premium', openPremiumModal);
     return () => window.removeEventListener('studyflow:open-premium', openPremiumModal);
   }, []);
+  useEffect(() => {
+    if (profileLoading || billing.isLoading || setsLoading || profileError || setsError || !profile) return;
+    onReady?.();
+  }, [billing.isLoading, onReady, profile, profileError, profileLoading, setsError, setsLoading]);
+  useEffect(() => {
+    if (profileLoading || billing.isLoading || setsLoading) return;
+    const timer = window.setTimeout(() => {
+      void Promise.all([loadStudiesView(), loadFlashcardsView(), loadQuizView(), loadProgressView(), loadProfileView(), loadMindMapsView()]);
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [billing.isLoading, profileLoading, setsLoading]);
   useEffect(() => {    if (!profile || profileLoading || setsLoading || replayTutorial || walkthroughDismissed) return;
     if (profile.walkthrough_completed || !profile.onboarding_completed || !starterSetsCreated || !studySets.length) return;
     setWalkthroughActive(true);
@@ -124,7 +185,7 @@ function AuthenticatedApp({ user }: { user: NonNullable<ReturnType<typeof useAut
   const tourPremiumAccess = billing.isPremium || walkthroughActive;
 
   const notify = (type: ToastMessage['type'], message: string) => setToast({ id: newId('toast'), type, message });
-  const navigate = (view: ViewId) => { setActiveView(view); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const navigate = (view: ViewId) => { onNavigateAway?.(); setActiveView(view); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const requirePremium = (message = 'Assine o StudyFlow Premium para salvar seus estudos e usar este recurso.') => {
     notify('info', message);
     setPremiumOpen(true);
@@ -137,6 +198,7 @@ function AuthenticatedApp({ user }: { user: NonNullable<ReturnType<typeof useAut
 
     setCreateOpen(true);
   };
+  const onCancel = () => setCreateOpen(false);
   const study = (set: StudySet, flashcardId?: string) => {
     if (!billing.isPremium && !walkthroughActive) {
       setActiveSetId(set.id);
@@ -201,7 +263,5 @@ function AuthenticatedApp({ user }: { user: NonNullable<ReturnType<typeof useAut
   if (paymentReturnStatus) return <PaymentStatusScreen status={paymentReturnStatus} isPremium={billing.isPremium} checking={billing.isRefreshing} errorMessage={billing.errorMessage} onCheck={() => void billing.refresh()} onContinue={() => { window.history.replaceState({}, document.title, '/'); setActiveView('home'); }}/>;
   if (shouldShowFirstRunOnboarding) return <OnboardingFlow onComplete={finishTutorial} onBypass={() => setOnboardingBypassed(true)} />;
 
-  return <div className="app-shell"><Sidebar activeView={visibleView} onNavigate={navigate} profile={profile} subscription={billing.subscription} isPremium={billing.isPremium}/><main className="main-content"><Header view={visibleView} search={search} onSearch={setSearch} onCreate={openCreate} userName={profile.full_name} showStudyActions={!nonStudyActionViews.has(visibleView)}/>{content()}</main><BottomNavigation activeView={visibleView} onNavigate={navigate} isPremium={billing.isPremium}/><Modal open={premiumOpen} onClose={() => setPremiumOpen(false)} hideHeader className="modal--premium" title="Assine o StudyFlow"><div className="premium-window">{premiumWindow}</div></Modal><Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Crie seu conjunto" description="Os dados serão salvos na sua conta."><CreateStudySetForm onSave={saveSet} onCancel={() => setCreateOpen(false)}/></Modal>{replayTutorial && <OnboardingFlow onComplete={finishTutorial} onBypass={() => setReplayTutorial(false)} />}<Modal open={Boolean(legacySets)} onClose={() => { localStorage.removeItem(LEGACY_KEY); setLegacySets(undefined); }} title="Encontramos estudos neste navegador" description="Você decide se quer levá-los para sua conta."><div className="legacy-import"><p>Os dados antigos não serão enviados sem sua autorização. Conjuntos com o mesmo nome serão ignorados.</p><div><Button variant="ghost" onClick={() => { localStorage.removeItem(LEGACY_KEY); setLegacySets(undefined); }}>Descartar dados locais</Button><Button loading={importing} onClick={() => void importLegacy()}>Importar para minha conta</Button></div></div></Modal><GuidedTour active={walkthroughActive} onNavigate={navigate} onPrepareStep={prepareTourStep} onComplete={finishGuidedTour} onSkip={finishGuidedTour}/> {toast && <Toast toast={toast} onClose={() => setToast(undefined)}/>}</div>;
+  return <div className="app-shell"><Sidebar activeView={visibleView} onNavigate={navigate} profile={profile} subscription={billing.subscription} isPremium={billing.isPremium}/><main className="main-content"><Header view={visibleView} search={search} onSearch={setSearch} onCreate={openCreate} userName={profile.full_name} showStudyActions={!nonStudyActionViews.has(visibleView)}/><Suspense fallback={null}>{content()}</Suspense></main><BottomNavigation activeView={visibleView} onNavigate={navigate} isPremium={billing.isPremium}/><Modal open={premiumOpen} onClose={() => setPremiumOpen(false)} hideHeader className="modal--premium" title="Assine o StudyFlow"><div className="premium-window">{premiumWindow}</div></Modal><Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Crie seu conjunto" description="Os dados serão salvos na sua conta."><CreateStudySetForm onSave={saveSet} onCancel={onCancel}/></Modal>{replayTutorial && <OnboardingFlow onComplete={finishTutorial} onBypass={() => setReplayTutorial(false)} />}<Modal open={Boolean(legacySets)} onClose={() => { localStorage.removeItem(LEGACY_KEY); setLegacySets(undefined); }} title="Encontramos estudos neste navegador" description="Você decide se quer levá-los para sua conta."><div className="legacy-import"><p>Os dados antigos não serão enviados sem sua autorização. Conjuntos com o mesmo nome serão ignorados.</p><div><Button variant="ghost" onClick={() => { localStorage.removeItem(LEGACY_KEY); setLegacySets(undefined); }}>Descartar dados locais</Button><Button loading={importing} onClick={() => void importLegacy()}>Importar para minha conta</Button></div></div></Modal><GuidedTour active={walkthroughActive} onNavigate={navigate} onPrepareStep={prepareTourStep} onComplete={finishGuidedTour} onSkip={finishGuidedTour}/> {toast && <Toast toast={toast} onClose={() => setToast(undefined)}/>}</div>;
 }
-
-

@@ -1,8 +1,11 @@
 import { apiGet, apiPost } from '../lib/apiClient';
 import type { AppUser } from '../types/auth';
 import type { Profile } from '../types';
+import { consumeBootstrapProfile } from './authService';
 
-export async function getOrCreateProfile(_user: AppUser): Promise<Profile> {
+export async function getOrCreateProfile(user: AppUser): Promise<Profile> {
+  const cached = consumeBootstrapProfile(user.id);
+  if (cached.found) return cached.value;
   const { profile } = await apiGet<{ profile: Profile }>('/api/profile');
   return profile;
 }

@@ -45,7 +45,6 @@ import type {
   AdminPaginatedUsers,
   AdminSeriesPoint,
 } from '../types/admin';
-import './admin.css';
 
 interface AdminIdentity {
   id: string;
@@ -58,6 +57,10 @@ interface AdminAppProps {
   authenticated: boolean;
   authError?: string;
   authLoading: boolean;
+  verificationEnabled?: boolean;
+  stealthFallback?: ReactNode;
+  revealCancelled?: boolean;
+  onReveal?: () => void;
 }
 
 const periodOptions = [
@@ -66,6 +69,7 @@ const periodOptions = [
   ['7d', 'Últimos 7 dias'],
   ['30d', 'Últimos 30 dias'],
   ['90d', 'Últimos 90 dias'],
+  ['12m', 'Últimos 12 meses'],
   ['month', 'Este mês'],
   ['previous_month', 'Mês anterior'],
   ['year', 'Este ano'],
@@ -147,7 +151,7 @@ function usePathname() {
   return pathname;
 }
 
-export function AdminApp({ authenticated, authError, authLoading }: AdminAppProps) {
+export function AdminApp({ authenticated, authError, authLoading, verificationEnabled = true, stealthFallback, revealCancelled = false, onReveal }: AdminAppProps) {
   const pathname = usePathname();
   const [admin, setAdmin] = useState<AdminIdentity | null>(null);
   const [accessError, setAccessError] = useState('');
@@ -158,8 +162,19 @@ export function AdminApp({ authenticated, authError, authLoading }: AdminAppProp
   const [refreshKey, setRefreshKey] = useState(0);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [globalSearch, setGlobalSearch] = useState('');
+  const [panelReady, setPanelReady] = useState(false);
+  const [stylesReady, setStylesReady] = useState(false);
+  const initialWarmDone = useRef(false);
+  const stealth = stealthFallback !== undefined;
 
   useEffect(() => {
+    let mounted = true;
+    void import('./admin.css').then(() => { if (mounted) setStylesReady(true); });
+    return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!verificationEnabled) return;
     if (authLoading) return;
     if (!authenticated) {
       setIsChecking(false);
@@ -169,40 +184,65 @@ export function AdminApp({ authenticated, authError, authLoading }: AdminAppProp
     getAdminSession()
       .then(({ admin: identity }) => setAdmin(identity))
       .catch((error: Error) => {
-        if (error instanceof ApiError && error.status === 403) {
+        if (!stealth && error instanceof ApiError && error.status === 403) {
           window.location.replace('/');
           return;
         }
         setAccessError(error.message);
       })
       .finally(() => setIsChecking(false));
-  }, [authenticated, authLoading]);
+  }, [authenticated, authLoading, stealth, verificationEnabled]);
 
   const periodSelection: AdminPeriodSelection = period === 'custom' ? { period, start: customStart, end: customEnd } : { period };
 
 
   useEffect(() => {
     if (!admin) return;
+    const periodDependencies = [periodSelection.period, periodSelection.start, periodSelection.end, refreshKey];
+    const requests: Promise<unknown>[] = [];
+    const prefetch = <T,>(key: string, loader: () => Promise<T>) => {
+      requests.push(fetchWithAdminCache(key, loader));
+    };
 
-    // Pré-carrega as seções mais acessadas depois que a tela inicial já começou
-    // a renderizar. O cache também elimina requisições duplicadas ao trocar de aba.
-    const timer = window.setTimeout(() => {
-      const periodDependencies = [periodSelection.period, periodSelection.start, periodSelection.end, refreshKey];
-      const prefetch = <T,>(key: string, loader: () => Promise<T>) => {
-        void fetchWithAdminCache(key, loader).catch(() => undefined);
-      };
+    // Aquece imediatamente todas as rotas padrão. Ao navegar, o componente lê o
+    // resultado já pronto do cache em memória, sem exibir skeleton entre abas.
+    prefetch(adminCacheKey('overview', periodDependencies), () => getAdminOverview(periodSelection));
+    prefetch(adminCacheKey('engagement', periodDependencies), () => getAdminSection<EngagementResponse>('engagement', periodSelection));
+    prefetch(adminCacheKey('resources', periodDependencies), () => getAdminSection<ResourcesResponse>('resources', periodSelection));
+    prefetch(adminCacheKey('finance', [refreshKey]), () => getAdminSection<FinanceResponse>('finance'));
+    prefetch(adminCacheKey('payments', [refreshKey]), () => getAdminSection<PaymentsResponse>('payments'));
+    prefetch(adminCacheKey('reports', [refreshKey]), () => getAdminSection<ReportsResponse>('reports'));
+    prefetch(adminCacheKey('settings', [refreshKey]), () => getAdminSection<SettingsResponse>('settings'));
+    prefetch(adminCacheKey('users', ['', 'all', 'created', 'desc', 1, refreshKey]), () => getAdminUsers({ search: '', filter: 'all', sort: 'created', direction: 'desc', page: 1, pageSize: 25 }));
+    prefetch(adminCacheKey('subscriptions', ['', 'all', 1, refreshKey]), () => getAdminSubscriptions({ search: '', status: 'all', page: 1, pageSize: 25 }));
+    prefetch(adminCacheKey('errors', ['all', 1, refreshKey, 0]), () => getAdminSection<ErrorsResponse>('errors?status=all&page=1&pageSize=25'));
 
-      prefetch(adminCacheKey('overview', periodDependencies), () => getAdminOverview(periodSelection));
-      prefetch(adminCacheKey('engagement', periodDependencies), () => getAdminSection<EngagementResponse>('engagement', periodSelection));
-      prefetch(adminCacheKey('resources', periodDependencies), () => getAdminSection<ResourcesResponse>('resources', periodSelection));
-      prefetch(adminCacheKey('finance', [refreshKey]), () => getAdminSection<FinanceResponse>('finance'));
-      prefetch(adminCacheKey('payments', [refreshKey]), () => getAdminSection<PaymentsResponse>('payments'));
-      prefetch(adminCacheKey('reports', [refreshKey]), () => getAdminSection<ReportsResponse>('reports'));
-      prefetch(adminCacheKey('settings', [refreshKey]), () => getAdminSection<SettingsResponse>('settings'));
-    }, 900);
-
-    return () => window.clearTimeout(timer);
+    let mounted = true;
+    void Promise.allSettled(requests).then(() => {
+      if (!mounted || initialWarmDone.current) return;
+      initialWarmDone.current = true;
+      setPanelReady(true);
+    });
+    return () => { mounted = false; };
   }, [admin, periodSelection.period, periodSelection.start, periodSelection.end, refreshKey]);
+
+  useEffect(() => {
+    if (!stealth || !verificationEnabled || authLoading || isChecking) return;
+    if (!authenticated || authError || accessError || revealCancelled) {
+      window.history.replaceState({}, document.title, '/');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    }
+  }, [accessError, authError, authenticated, authLoading, isChecking, revealCancelled, stealth, verificationEnabled]);
+
+  useEffect(() => {
+    if (stealth && panelReady && stylesReady && admin && !revealCancelled) onReveal?.();
+  }, [admin, onReveal, panelReady, revealCancelled, stealth, stylesReady]);
+
+  if (stealth && (authLoading || isChecking || !authenticated || Boolean(authError) || Boolean(accessError) || !admin || !panelReady || !stylesReady || revealCancelled)) {
+    return stealthFallback;
+  }
+
+  if (!stylesReady) return <AdminLoading label="Preparando interface..." />;
 
   if (authLoading || isChecking) return <AdminLoading label="Validando acesso administrativo..." />;
   if (authError) return <AdminError message={authError} onRetry={() => window.location.reload()} />;
@@ -213,7 +253,7 @@ export function AdminApp({ authenticated, authError, authLoading }: AdminAppProp
   const title = pathname.startsWith('/admin/usuarios/') ? 'Perfil do usuário' : pageTitles[basePath] ?? 'Painel administrativo';
 
   return (
-    <div className="admin-shell">
+    <div className="admin-shell admin-shell--home">
       <AdminSidebar pathname={basePath} mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
       <div className="admin-main">
         <header className="admin-topbar">
@@ -237,6 +277,7 @@ export function AdminApp({ authenticated, authError, authLoading }: AdminAppProp
         <main className="admin-content">
           <AdminRoute pathname={pathname} periodSelection={periodSelection} refreshKey={refreshKey} onPeriodChange={setPeriod} />
         </main>
+        <footer className="admin-footer">© {new Date().getFullYear()} StudyFlow. Todos os direitos reservados.</footer>
       </div>
     </div>
   );
@@ -308,14 +349,14 @@ function HomeMetricCard({ metric, icon }: { metric: AdminMetric | null; icon: Re
 
 function HomePage({ periodSelection, refreshKey, onPeriodChange }: { periodSelection: AdminPeriodSelection; refreshKey: number; onPeriodChange: (period: string) => void }) {
   const state = useAsyncData('overview', () => getAdminOverview(periodSelection), [periodSelection.period, periodSelection.start, periodSelection.end, refreshKey]);
-  if (state.loading) return <div className="admin-home"><AdminSkeleton rows={7} /></div>;
+  if (state.loading) return <div className="admin-home" aria-label="Carregando dados" />;
   if (state.error || !state.data) return <div className="admin-home"><AdminError message={state.error || 'Dados indisponíveis.'} onRetry={state.retry} /></div>;
 
   const overview = state.data;
   const premiumUsers = findOverviewMetric(overview, 'premium-users')?.value ?? 0;
   const freeUsers = findOverviewMetric(overview, 'free-users')?.value ?? 0;
   const quickPeriods = [
-    ['year', '12 meses'],
+    ['12m', '12 meses'],
     ['30d', '30 dias'],
     ['7d', '7 dias'],
     ['today', '24 horas'],
@@ -342,12 +383,12 @@ function HomePage({ periodSelection, refreshKey, onPeriodChange }: { periodSelec
               {quickPeriods.map(([value, label]) => <button key={value} className={periodSelection.period === value ? 'is-active' : ''} onClick={() => onPeriodChange(value)}>{label}</button>)}
             </div>
           </header>
-          <div className="admin-home-panel__body"><BarChart points={overview.userGrowth} /></div>
+          <div className="admin-home-panel__body"><HomeBarChart points={overview.userGrowth} /></div>
         </section>
 
         <section className="admin-home-panel admin-home-panel--distribution">
           <header><div><h2>Usuários por plano</h2><p>Distribuição atual entre gratuito e Premium</p></div></header>
-          <div className="admin-home-panel__body"><DonutChart segments={[{ label: 'Premium', value: Number(premiumUsers) }, { label: 'Gratuitos', value: Number(freeUsers) }]} centerLabel="Usuários" /></div>
+          <div className="admin-home-panel__body"><DonutChart segments={[{ label: 'Premium', value: Number(premiumUsers) }, { label: 'Gratuitos', value: Number(freeUsers) }]} centerLabel="Usuários" palette={['#ffffff', '#cfcfcf']} /></div>
         </section>
       </div>
     </div>
@@ -356,7 +397,7 @@ function HomePage({ periodSelection, refreshKey, onPeriodChange }: { periodSelec
 
 function OverviewPage({ periodSelection, refreshKey }: { periodSelection: AdminPeriodSelection; refreshKey: number }) {
   const state = useAsyncData('overview', () => getAdminOverview(periodSelection), [periodSelection.period, periodSelection.start, periodSelection.end, refreshKey]);
-  if (state.loading) return <AdminSkeleton />;
+  if (state.loading) return null;
   if (state.error || !state.data) return <AdminError message={state.error || 'Dados indisponíveis.'} onRetry={state.retry} />;
   const overview = state.data;
   return (
@@ -405,7 +446,6 @@ function UsersPage({ refreshKey }: { refreshKey: number }) {
         <select value={`${sort}:${direction}`} onChange={(event: ChangeEvent<HTMLSelectElement>) => { const [nextSort, nextDirection] = event.target.value.split(':'); setSort(nextSort); setDirection(nextDirection); setPage(1); }}><option value="created:desc">Mais recentes</option><option value="created:asc">Mais antigos</option><option value="name:asc">Nome A–Z</option><option value="name:desc">Nome Z–A</option><option value="last_login:desc">Acesso mais recente</option><option value="last_login:asc">Acesso mais antigo</option></select>
         <a className="admin-secondary-button" href={`/api/admin/report${buildAdminQuery({ type: 'users', search: debouncedSearch, filter: filter === 'all' ? undefined : filter })}`}><Download size={16} /> Exportar CSV</a>
       </div>
-      {state.loading && <AdminSkeleton rows={8} />}
       {state.error && <AdminError message={state.error} onRetry={state.retry} />}
       {state.data && <UsersTable result={state.data} page={page} onPage={setPage} />}
     </div>
@@ -424,7 +464,7 @@ function UsersTable({ result, page, onPage }: { result: AdminPaginatedUsers; pag
 function UserDetailPage({ userId, refreshKey }: { userId: string; refreshKey: number }) {
   const [copySuccess, setCopySuccess] = useState(false);
   const state = useAsyncData(`user:${userId}`, () => getAdminUser(userId), [userId, refreshKey]);
-  if (state.loading) return <AdminSkeleton />;
+  if (state.loading) return null;
   if (state.error || !state.data) return <AdminError message={state.error || 'Usuário não encontrado.'} onRetry={state.retry} />;
   const user = state.data;
   const copyId = async () => { await navigator.clipboard.writeText(user.id); setCopySuccess(true); window.setTimeout(() => setCopySuccess(false), 1800); };
@@ -457,7 +497,7 @@ function SubscriptionsPage({ refreshKey }: { refreshKey: number }) {
   return <div className="admin-stack">
     <AdminNotice>Nenhuma ação financeira manual foi criada. O status exibido vem do registro sincronizado com o Mercado Pago.</AdminNotice>
     <div className="admin-toolbar"><label className="admin-search"><Search size={17} /><input value={search} onChange={(event: ChangeEvent<HTMLInputElement>) => setSearch(event.target.value)} placeholder="Usuário, e-mail ou ID" /></label><select value={status} onChange={(event: ChangeEvent<HTMLSelectElement>) => { setStatus(event.target.value); setPage(1); }}><option value="all">Todos os status</option><option value="active">Ativa</option><option value="pending">Pendente</option><option value="cancelled">Cancelada</option><option value="rejected">Recusada</option><option value="paused">Pausada</option></select><a className="admin-secondary-button" href={`/api/admin/report${buildAdminQuery({ type: 'subscriptions', search: debouncedSearch, status: status === 'all' ? undefined : status })}`}><Download size={16} /> Exportar CSV</a></div>
-    {state.loading && <AdminSkeleton rows={8} />}{state.error && <AdminError message={state.error} onRetry={state.retry} />}{state.data && <SubscriptionsTable result={state.data} page={page} onPage={setPage} />}
+    {state.error && <AdminError message={state.error} onRetry={state.retry} />}{state.data && <SubscriptionsTable result={state.data} page={page} onPage={setPage} />}
   </div>;
 }
 
@@ -469,7 +509,7 @@ function SubscriptionsTable({ result, page, onPage }: { result: AdminPaginatedSu
 interface PaymentsResponse { payments: { available: boolean; reason: string; implementationRequired: string } }
 function PaymentsPage({ refreshKey }: { refreshKey: number }) {
   const state = useAsyncData('payments', () => getAdminSection<PaymentsResponse>('payments'), [refreshKey]);
-  if (state.loading) return <AdminSkeleton />;
+  if (state.loading) return null;
   if (state.error || !state.data) return <AdminError message={state.error || 'Erro ao carregar.'} onRetry={state.retry} />;
   return <AdminPanel title="Pagamentos individuais" subtitle="Receita, taxas, liquidações e reembolsos"><AdminUnavailable reason={`${state.data.payments.reason} ${state.data.payments.implementationRequired}`} /></AdminPanel>;
 }
@@ -477,7 +517,7 @@ function PaymentsPage({ refreshKey }: { refreshKey: number }) {
 interface EngagementResponse { engagement: { metrics: { activeUsers: number; sessions: number; averageSessionsPerActiveUser: number; retentionD1: number | null; retentionD7: number | null; retentionD30: number | null }; notice: string; topUsers: Array<{ id: string; name: string; email: string; events: number }>; abandonedUsers: Array<{ id: string; name: string; email: string; lastLoginAt: string | null }>; activeSeries: AdminSeriesPoint[] } }
 function EngagementPage({ periodSelection, refreshKey }: { periodSelection: AdminPeriodSelection; refreshKey: number }) {
   const state = useAsyncData('engagement', () => getAdminSection<EngagementResponse>('engagement', periodSelection), [periodSelection.period, periodSelection.start, periodSelection.end, refreshKey]);
-  if (state.loading) return <AdminSkeleton />;
+  if (state.loading) return null;
   if (state.error || !state.data) return <AdminError message={state.error || 'Erro ao carregar.'} onRetry={state.retry} />;
   const data = state.data.engagement;
   const metrics: AdminMetric[] = [
@@ -494,7 +534,7 @@ function EngagementPage({ periodSelection, refreshKey }: { periodSelection: Admi
 interface ResourcesResponse { resources: { flashcards: { created: number; reviewed: number; uniqueUsers: number }; mentalMaps: { created: number; uniqueUsers: number }; quizzes: { completed: number; uniqueUsers: number; averageAccuracy: number }; ai: { available: boolean; reason: string }; series: Array<{ date: string; flashcards: number; mentalMaps: number; quizzes: number }> } }
 function ResourcesPage({ periodSelection, refreshKey }: { periodSelection: AdminPeriodSelection; refreshKey: number }) {
   const state = useAsyncData('resources', () => getAdminSection<ResourcesResponse>('resources', periodSelection), [periodSelection.period, periodSelection.start, periodSelection.end, refreshKey]);
-  if (state.loading) return <AdminSkeleton />;
+  if (state.loading) return null;
   if (state.error || !state.data) return <AdminError message={state.error || 'Erro ao carregar.'} onRetry={state.retry} />;
   const data = state.data.resources;
   return <div className="admin-stack"><div className="admin-grid-3"><AdminPanel title="Flashcards"><div className="admin-summary-list"><Detail label="Criados" value={String(data.flashcards.created)} /><Detail label="Revisões" value={String(data.flashcards.reviewed)} /><Detail label="Usuários únicos" value={String(data.flashcards.uniqueUsers)} /></div></AdminPanel><AdminPanel title="Mapas mentais"><div className="admin-summary-list"><Detail label="Criados" value={String(data.mentalMaps.created)} /><Detail label="Usuários únicos" value={String(data.mentalMaps.uniqueUsers)} /></div></AdminPanel><AdminPanel title="Testes"><div className="admin-summary-list"><Detail label="Realizados" value={String(data.quizzes.completed)} /><Detail label="Usuários únicos" value={String(data.quizzes.uniqueUsers)} /><Detail label="Média de acertos" value={formatMetric(data.quizzes.averageAccuracy, 'percent')} /></div></AdminPanel></div><AdminPanel title="Inteligência artificial"><AdminUnavailable reason={data.ai.reason} /></AdminPanel></div>;
@@ -503,7 +543,7 @@ function ResourcesPage({ periodSelection, refreshKey }: { periodSelection: Admin
 interface FinanceResponse { finance: { contracted: { activeSubscriptions: number; pendingSubscriptions: number; cancelledSubscriptions: number; rejectedSubscriptions: number; mrr: number; averageContract: number }; realizedRevenue: { available: boolean; reason: string }; aiCosts: { available: boolean; reason: string } } }
 function FinancePage({ refreshKey }: { refreshKey: number }) {
   const state = useAsyncData('finance', () => getAdminSection<FinanceResponse>('finance'), [refreshKey]);
-  if (state.loading) return <AdminSkeleton />;
+  if (state.loading) return null;
   if (state.error || !state.data) return <AdminError message={state.error || 'Erro ao carregar.'} onRetry={state.retry} />;
   const data = state.data.finance;
   const metrics: AdminMetric[] = [
@@ -531,7 +571,7 @@ function ErrorsPage({ refreshKey }: { refreshKey: number }) {
   const state = useAsyncData('errors', () => getAdminSection<ErrorsResponse>(`errors?status=${encodeURIComponent(status)}&page=${page}&pageSize=25`), [status, page, refreshKey, localRefresh]);
   useEffect(() => { const query = buildAdminQuery({ status: status === 'all' ? undefined : status, page }); window.history.replaceState({}, document.title, `/admin/erros${query}`); }, [status, page]);
   const changeStatus = async (id: string, nextStatus: string) => { setActionError(''); try { await updateAdminErrorStatus(id, nextStatus); setLocalRefresh((value) => value + 1); } catch (error) { setActionError(error instanceof Error ? error.message : 'Não foi possível atualizar o status.'); } };
-  if (state.loading) return <AdminSkeleton rows={8} />;
+  if (state.loading) return null;
   if (state.error || !state.data) return <AdminError message={state.error || 'Erro ao carregar.'} onRetry={state.retry} />;
   const data = state.data.result;
   return <div className="admin-stack"><AdminNotice>{data.notice}</AdminNotice>{actionError && <p className="admin-error-message">{actionError}</p>}<div className="admin-toolbar"><select value={status} onChange={(event: ChangeEvent<HTMLSelectElement>) => { setStatus(event.target.value); setPage(1); }}><option value="all">Todos</option><option value="new">Novos</option><option value="investigating">Investigando</option><option value="resolved">Resolvidos</option><option value="ignored">Ignorados</option></select><a className="admin-secondary-button" href={`/api/admin/report${buildAdminQuery({ type: 'errors', status: status === 'all' ? undefined : status })}`}><Download size={16} /> Exportar CSV</a></div>{data.errors.length ? <AdminPanel title={`${data.total} erros agrupados`}><div className="admin-table-wrap"><table><thead><tr><th>Mensagem</th><th>Categoria</th><th>Página</th><th>Navegador</th><th>Dispositivo</th><th>Ocorrências</th><th>Status</th><th>Última ocorrência</th></tr></thead><tbody>{data.errors.map((item) => <tr key={item.id}><td><strong>{item.message}</strong><span>{item.userId ?? 'Sem usuário'}</span></td><td>{item.category}</td><td>{item.page ?? '—'}</td><td><code>{item.browser ?? '—'}</code></td><td>{item.device ?? '—'}</td><td>{item.occurrences}</td><td><select value={item.status} onChange={(event: ChangeEvent<HTMLSelectElement>) => void changeStatus(item.id, event.target.value)}><option value="new">Novo</option><option value="investigating">Investigando</option><option value="resolved">Resolvido</option><option value="ignored">Ignorado</option></select></td><td>{formatDate(item.lastOccurredAt)}</td></tr>)}</tbody></table></div><Pagination page={page} pageSize={data.pageSize} total={data.total} onPage={setPage} /></AdminPanel> : <AdminEmpty title="Nenhum erro registrado" description="O monitoramento começa após a implantação desta versão." />}</div>;
@@ -540,7 +580,7 @@ function ErrorsPage({ refreshKey }: { refreshKey: number }) {
 interface ReportsResponse { reports: Array<{ type: string; label: string; available: boolean; reason?: string }> }
 function ReportsPage({ periodSelection, refreshKey }: { periodSelection: AdminPeriodSelection; refreshKey: number }) {
   const state = useAsyncData('reports', () => getAdminSection<ReportsResponse>('reports'), [refreshKey]);
-  if (state.loading) return <AdminSkeleton />;
+  if (state.loading) return null;
   if (state.error || !state.data) return <AdminError message={state.error || 'Erro ao carregar.'} onRetry={state.retry} />;
   return <div className="admin-report-grid">{state.data.reports.map((report) => <AdminPanel key={report.type} title={report.label} subtitle={report.available ? 'CSV gerado no servidor com autorização revalidada' : report.reason}>{report.available ? <a className="admin-primary-button" href={`/api/admin/report${buildAdminQuery({ type: report.type, period: periodSelection.period, start: periodSelection.start, end: periodSelection.end })}`}><Download size={16} /> Baixar CSV</a> : <AdminUnavailable reason={report.reason ?? 'Indisponível'} />}</AdminPanel>)}</div>;
 }
@@ -566,7 +606,7 @@ function SettingsPage({ refreshKey }: { refreshKey: number }) {
       setSaving(false);
     }
   };
-  if (state.loading) return <AdminSkeleton />;
+  if (state.loading) return null;
   if (state.error || !state.data) return <AdminError message={state.error || 'Erro ao carregar.'} onRetry={state.retry} />;
   return <AdminPanel title="Configurações administrativas" subtitle="Somente preferências realmente utilizadas pelo painel. Segredos não são exibidos."><div className="admin-form-grid"><label><span>Dias para considerar inatividade</span><input type="number" min="1" max="365" value={Number(values.inactivity_days ?? 30)} onChange={(event: ChangeEvent<HTMLInputElement>) => setValues((current) => ({ ...current, inactivity_days: Number(event.target.value) }))} /><small>Este valor altera os filtros de usuários ativos e inativos no backend.</small></label></div>{success && <p className="admin-success-message">{success}</p>}{saveError && <p className="admin-error-message">{saveError}</p>}<button className="admin-primary-button" disabled={saving} onClick={() => void save()}>{saving ? 'Salvando...' : 'Salvar configurações'}</button></AdminPanel>;
 }
@@ -649,10 +689,57 @@ function BarChart({ points }: { points: AdminSeriesPoint[] }) {
   );
 }
 
-const donutPalette = ['#4f46e5', '#818cf8', '#c7d2fe', '#e0e7ff', '#a5b4fc'];
+function HomeBarChart({ points }: { points: AdminSeriesPoint[] }) {
+  const bars = useMemo(() => {
+    if (!points.length) return [];
+    const maxValue = Math.max(...points.map((point) => point.value), 1);
+    const ceiling = Math.max(5, Math.ceil(maxValue));
+    return points.map((point) => ({ ...point, ceiling, heightPercent: (point.value / ceiling) * 100 }));
+  }, [points]);
+
+  if (!bars.length) return <AdminEmpty title="Sem registros no período" description="O gráfico será preenchido quando houver dados." />;
+  const ceiling = bars[0].ceiling;
+  const formatShortDate = (value: string) => {
+    const hourly = value.includes('T');
+    const date = new Date(hourly ? value : `${value.slice(0, 10)}T12:00:00`);
+    if (Number.isNaN(date.getTime())) return value;
+    return new Intl.DateTimeFormat('pt-BR', hourly
+      ? { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }
+      : { day: '2-digit', month: 'short', year: 'numeric' }).format(date).replace('.', '');
+  };
+  const formatAxisLabel = (value: string, index: number) => {
+    if (value.includes('T')) return String(new Date(value).getUTCHours() + 1);
+    if (bars.length <= 12) {
+      const date = new Date(`${value.slice(0, 10)}T12:00:00`);
+      return new Intl.DateTimeFormat('pt-BR', { month: 'short' }).format(date).replace('.', '');
+    }
+    return String(index + 1);
+  };
+
+  return (
+    <div className="admin-home-chart" role="img" aria-label="Crescimento de usuários no período">
+      <div className="admin-home-chart__plot">
+        <div className="admin-home-chart__grid" aria-hidden="true">
+          {Array.from({ length: 6 }, (_, index) => <span key={index} style={{ bottom: `${index * 20}%` }}><b>{Math.round((ceiling * index) / 5)}</b></span>)}
+        </div>
+        <div className="admin-home-chart__bars">
+          {bars.map((bar, index) => (
+            <div key={bar.date} className="admin-home-chart__column" data-day={formatAxisLabel(bar.date, index)}>
+              <div className="admin-home-chart__bar" style={{ height: `${bar.heightPercent}%` }} />
+              <div className="admin-home-chart__tooltip" style={{ bottom: `calc(${bar.heightPercent}% + 8px)` }}><strong>{formatShortDate(bar.date)}</strong><span>Usuários: {bar.value}</span></div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="admin-home-chart__range"><span>{formatShortDate(bars[0].date)}</span><span>{formatShortDate(bars.at(-1)?.date ?? '')}</span></div>
+    </div>
+  );
+}
+
+const donutPalette = ['#ffffff', '#d0d0d0', '#a3a3a3', '#737373', '#525252'];
 
 interface DonutSegment { label: string; value: number }
-function DonutChart({ segments, centerLabel }: { segments: DonutSegment[]; centerLabel: string }) {
+function DonutChart({ segments, centerLabel, palette = donutPalette }: { segments: DonutSegment[]; centerLabel: string; palette?: string[] }) {
   const total = segments.reduce((sum, segment) => sum + segment.value, 0);
   if (!total) return <AdminEmpty title="Sem dados para exibir" description="Este gráfico será preenchido quando houver registros." />;
   let cumulative = 0;
@@ -660,7 +747,7 @@ function DonutChart({ segments, centerLabel }: { segments: DonutSegment[]; cente
     const start = (cumulative / total) * 100;
     cumulative += segment.value;
     const end = (cumulative / total) * 100;
-    return `${donutPalette[index % donutPalette.length]} ${start}% ${end}%`;
+    return `${palette[index % palette.length]} ${start}% ${end}%`;
   });
   return (
     <div className="admin-donut">
@@ -670,7 +757,7 @@ function DonutChart({ segments, centerLabel }: { segments: DonutSegment[]; cente
       <div className="admin-donut__legend">
         {segments.map((segment, index) => (
           <div key={segment.label} className="admin-donut__legend-item">
-            <i style={{ background: donutPalette[index % donutPalette.length] }} />
+            <i style={{ background: palette[index % palette.length] }} />
             <span>{segment.label}</span>
             <b>{new Intl.NumberFormat('pt-BR').format(segment.value)}</b>
           </div>
@@ -702,7 +789,6 @@ function AdminError({ message, onRetry }: { message: string; onRetry: () => void
 function AdminEmpty({ title, description }: { title: string; description: string }) { return <div className="admin-state"><BarChart3 size={28} /><h3>{title}</h3><p>{description}</p></div>; }
 function AdminUnavailable({ reason }: { reason: string }) { return <div className="admin-unavailable"><AlertTriangle size={22} /><div><strong>Dados ainda não disponíveis</strong><p>{reason}</p></div></div>; }
 function AdminNotice({ children }: { children: ReactNode }) { return <div className="admin-notice"><AlertTriangle size={18} /><p>{children}</p></div>; }
-function AdminSkeleton({ rows = 4 }: { rows?: number }) { return <div className="admin-skeleton" aria-label="Carregando dados">{Array.from({ length: rows }, (_, index) => <div key={index} />)}</div>; }
 function Detail({ label, value }: { label: string; value: string }) { return <div className="admin-detail"><span>{label}</span><strong>{value}</strong></div>; }
 function SimpleUserList({ users }: { users: Array<{ id: string; name: string; email: string; value: string }> }) { return users.length ? <div className="admin-user-list">{users.map((user) => <button key={user.id} onClick={() => navigateTo(`/admin/usuarios/${encodeURIComponent(user.id)}`)}><div><strong>{user.name}</strong><span>{user.email}</span></div><b>{user.value}</b></button>)}</div> : <AdminEmpty title="Sem usuários" description="Não há dados para este período." />; }
 function statLabel(key: string) { return ({ studySets: 'Conjuntos', flashcards: 'Flashcards', reviews: 'Revisões', mentalMaps: 'Mapas mentais', quizzes: 'Testes', quizAccuracy: 'Média de acertos', progressPercentage: 'Progresso médio', sessions: 'Sessões', activeDays: 'Dias ativos' } as Record<string, string>)[key] ?? key; }

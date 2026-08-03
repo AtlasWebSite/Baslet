@@ -43,15 +43,8 @@ function getErrorRequestContext(request: VercelRequest) {
 }
 
 function handleAccessError(response: VercelResponse, error: AdminAccessError) {
-  if (error.code === 'AUTH_REQUIRED') {
-    json(response, 401, { error: 'Entre novamente para acessar o painel administrativo.', code: error.code });
-    return;
-  }
-  if (error.code === 'ADMIN_NOT_CONFIGURED') {
-    json(response, 503, { error: 'O proprietário ainda não foi configurado no ambiente.', code: error.code });
-    return;
-  }
-  json(response, 403, { error: 'Esta conta não possui acesso administrativo.', code: error.code });
+  void error;
+  json(response, 404, { error: 'Página não encontrada.' });
 }
 
 function safeFileName(type: string) {

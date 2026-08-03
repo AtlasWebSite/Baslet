@@ -1,6 +1,7 @@
 import { apiDelete, apiGet, apiPost } from '../lib/apiClient';
 import { starterStudySets } from '../data/starterStudySets';
 import type { StudySet } from '../types';
+import { consumeBootstrapStudySets } from './authService';
 
 interface StarterSetResult {
   created: boolean;
@@ -9,7 +10,9 @@ interface StarterSetResult {
 
 const starterCreationTasks = new Map<string, Promise<StarterSetResult>>();
 
-export async function fetchStudySets(_userId: string): Promise<StudySet[]> {
+export async function fetchStudySets(userId: string): Promise<StudySet[]> {
+  const cached = consumeBootstrapStudySets(userId);
+  if (cached.found) return cached.value;
   const { studySets } = await apiGet<{ studySets: StudySet[] }>('/api/study-sets');
   return studySets;
 }
