@@ -8,3 +8,6 @@ Baslet Antes da Kime/
 *.log
 *.tsbuildinfo
 .vercel
+
+.vercel
+.env*
