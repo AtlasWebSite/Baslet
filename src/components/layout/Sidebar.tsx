@@ -84,11 +84,6 @@ export function Sidebar({ activeView, onNavigate, onBilling, profile, subscripti
   const renderNavigationButton = ({ id, label, icon: Icon }: NavigationItem) => {
     const isActive = activeView === id;
     const handleClick = () => {
-      if (id === 'profile') {
-        setProfileOpen(true);
-        return;
-      }
-
       if (id === 'billing') {
         openBillingFromSidebar();
         return;

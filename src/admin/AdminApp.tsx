@@ -640,7 +640,10 @@ function useAsyncData<T>(namespace: string, loader: () => Promise<T>, dependenci
   const [error, setError] = useState('');
   const [retryKey, setRetryKey] = useState(0);
   const loaderRef = useRef(loader);
-  loaderRef.current = loader;
+
+  useEffect(() => {
+    loaderRef.current = loader;
+  }, [loader]);
 
   useEffect(() => {
     let mounted = true;
@@ -742,13 +745,16 @@ interface DonutSegment { label: string; value: number }
 function DonutChart({ segments, centerLabel, palette = donutPalette }: { segments: DonutSegment[]; centerLabel: string; palette?: string[] }) {
   const total = segments.reduce((sum, segment) => sum + segment.value, 0);
   if (!total) return <AdminEmpty title="Sem dados para exibir" description="Este gráfico será preenchido quando houver registros." />;
-  let cumulative = 0;
-  const stops = segments.map((segment, index) => {
-    const start = (cumulative / total) * 100;
-    cumulative += segment.value;
-    const end = (cumulative / total) * 100;
-    return `${palette[index % palette.length]} ${start}% ${end}%`;
-  });
+  const stops = segments.reduce<{ cumulative: number; values: string[] }>((current, segment, index) => {
+    const start = (current.cumulative / total) * 100;
+    const nextCumulative = current.cumulative + segment.value;
+    const end = (nextCumulative / total) * 100;
+
+    return {
+      cumulative: nextCumulative,
+      values: [...current.values, `${palette[index % palette.length]} ${start}% ${end}%`],
+    };
+  }, { cumulative: 0, values: [] }).values;
   return (
     <div className="admin-donut">
       <div className="admin-donut__ring" style={{ background: `conic-gradient(${stops.join(', ')})` }}>
